@@ -4,6 +4,20 @@ type GasEnvelope = {
   data?: unknown;
 };
 
+function normalizeGasErrorMessage(message: string): string {
+  if (
+    message.includes("Cannot read properties of null (reading 'getSheetByName')") ||
+    message.includes("No spreadsheet connected")
+  ) {
+    return (
+      "GAS 尚未正確連到 Google 試算表。請將目前部署中的 Apps Script 更新為 repo 內最新版 gas/Code.gs；" +
+      "若你使用的是獨立 GAS 專案，還需要在 Script Properties 設定 SPREADSHEET_ID，之後重新部署 Web App。"
+    );
+  }
+
+  return message;
+}
+
 function getGasUrl(): string {
   const url = process.env.GAS_WEBAPP_URL?.trim();
 
@@ -18,7 +32,11 @@ async function parseGasEnvelope(response: Response): Promise<GasEnvelope> {
   const payload = (await response.json().catch(() => null)) as GasEnvelope | null;
 
   if (!response.ok) {
-    throw new Error(payload?.message || `GAS 請求失敗 (${response.status})`);
+    throw new Error(
+      normalizeGasErrorMessage(
+        payload?.message || `GAS 請求失敗 (${response.status})`,
+      ),
+    );
   }
 
   if (!payload || typeof payload !== "object") {
@@ -43,7 +61,11 @@ export async function callGasAction<T>(action: string, payload: unknown): Promis
   const envelope = await parseGasEnvelope(response);
 
   if (!envelope.ok) {
-    throw new Error(envelope.message || `GAS 動作 ${action} 執行失敗`);
+    throw new Error(
+      normalizeGasErrorMessage(
+        envelope.message || `GAS 動作 ${action} 執行失敗`,
+      ),
+    );
   }
 
   return envelope.data as T;
