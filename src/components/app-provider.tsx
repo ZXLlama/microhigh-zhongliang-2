@@ -156,7 +156,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    void navigator.serviceWorker.register("/sw.js").catch(() => undefined);
+    void navigator.serviceWorker
+      .register("/sw.js", {
+        updateViaCache: "none",
+      })
+      .then((registration) => registration.update())
+      .catch(() => undefined);
   }, []);
 
   useEffect(() => {
