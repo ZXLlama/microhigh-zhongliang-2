@@ -1,4 +1,4 @@
 bundle_id,bundle_name,bundle_price,is_active,sort_order
-breakfast-set,早餐套餐,75,true,10
-dessert-tea-set,點心飲料組,72,true,20
-double-egg-set,雙蛋豆漿組,60,true,30
+A-set,星空冷飲+爆米花,80,TRUE,10
+B-set,紅茶+爆米花,40,TRUE,20
+C-set,冬瓜茶+爆米花,40,TRUE,30

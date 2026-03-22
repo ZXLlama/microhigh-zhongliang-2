@@ -1,6 +1,6 @@
 product_id,name,price,cost,profit,category,is_active,sort_order
-rice-ball,飯糰,55,28,27,主食,true,10
-soy-milk,豆漿,30,12,18,飲料,true,20
-tea-egg,茶葉蛋,18,8,10,小食,true,30
-brownie,布朗尼,45,18,27,點心,true,40
-lemon-tea,檸檬紅茶,40,15,25,飲料,true,50
+galaxy-sprite,星空冷飲,70,10,60,飲料,TRUE,10
+sprite,雪碧,30,5,25,飲料,TRUE,20
+black-tea,紅茶,30,5,25,飲料,TRUE,30
+winter-melon-tea,冬瓜茶,30,5,25,飲料,TRUE,40
+popcorn,爆米花,20,5,15,點心,TRUE,50

@@ -1,7 +1,7 @@
 bundle_id,product_id,quantity
-breakfast-set,rice-ball,1
-breakfast-set,soy-milk,1
-dessert-tea-set,brownie,1
-dessert-tea-set,lemon-tea,1
-double-egg-set,tea-egg,2
-double-egg-set,soy-milk,1
+A-set,galaxy-sprite,1
+A-set,popcorn,1
+B-set,black-tea,1
+B-set,popcorn,1
+C-set,winter-melon-tea,2
+C-set,popcorn,1
