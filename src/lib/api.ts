@@ -24,7 +24,7 @@ async function readJsonResponse<T>(response: Response): Promise<T> {
   }
 
   if (!payload) {
-    throw new Error("API 回傳不是有效的 JSON");
+    throw new Error("API 回傳的不是有效 JSON");
   }
 
   return payload as T;

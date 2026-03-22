@@ -1,5 +1,3 @@
-import { APP_NAME } from "@/lib/constants";
-
 type GasEnvelope = {
   ok?: boolean;
   message?: string;
@@ -10,7 +8,7 @@ function getGasUrl(): string {
   const url = process.env.GAS_WEBAPP_URL?.trim();
 
   if (!url) {
-    throw new Error("尚未設定 GAS_WEBAPP_URL");
+    throw new Error("缺少環境變數 GAS_WEBAPP_URL");
   }
 
   return url;
@@ -24,7 +22,7 @@ async function parseGasEnvelope(response: Response): Promise<GasEnvelope> {
   }
 
   if (!payload || typeof payload !== "object") {
-    throw new Error("GAS 回傳格式異常");
+    throw new Error("GAS 回傳格式不正確");
   }
 
   return payload;
@@ -36,7 +34,6 @@ export async function callGasAction<T>(action: string, payload: unknown): Promis
     cache: "no-store",
     headers: {
       "Content-Type": "application/json",
-      "X-App-Name": APP_NAME,
     },
     body: JSON.stringify({
       action,
@@ -46,7 +43,7 @@ export async function callGasAction<T>(action: string, payload: unknown): Promis
   const envelope = await parseGasEnvelope(response);
 
   if (!envelope.ok) {
-    throw new Error(envelope.message || `GAS 動作 ${action} 失敗`);
+    throw new Error(envelope.message || `GAS 動作 ${action} 執行失敗`);
   }
 
   return envelope.data as T;
