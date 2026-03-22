@@ -11,6 +11,7 @@ export const MAX_SYNC_LOGS = 20;
 
 export const TAB_ITEMS = [
   { id: "cashier", label: "收銀台" },
+  { id: "cart", label: "購物車" },
   { id: "products", label: "商品設定" },
   { id: "bundles", label: "組合包" },
   { id: "today", label: "今日統計" },

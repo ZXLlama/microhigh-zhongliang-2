@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  startTransition,
-  useDeferredValue,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { startTransition, useEffect, useMemo, useState } from "react";
 import {
   BarChart3,
   Boxes,
@@ -20,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { usePosApp } from "@/components/app-provider";
+import { CartSection } from "@/components/sections/cart-section";
 import { BundlesSection } from "@/components/sections/bundles-section";
 import { CashierSection } from "@/components/sections/cashier-section";
 import { ProductsSection } from "@/components/sections/products-section";
@@ -44,8 +39,6 @@ import {
 } from "@/lib/sales";
 import type { CheckoutCartItem, CsvImportIssue } from "@/lib/types";
 import { cn, formatDateTime } from "@/lib/utils";
-
-type ItemFilter = "all" | "product" | "bundle";
 
 type CsvFileMap = {
   products: File | null;
@@ -131,17 +124,12 @@ export function AppShell() {
   } = usePosApp();
 
   const [activeTab, setActiveTab] = useState<TabId>("cashier");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [itemFilter, setItemFilter] = useState<ItemFilter>("all");
-  const [categoryFilter, setCategoryFilter] = useState("all");
-  const [showInactive, setShowInactive] = useState(false);
   const [csvFiles, setCsvFiles] = useState<CsvFileMap>(EMPTY_FILES);
   const [importIssues, setImportIssues] = useState<CsvImportIssue[]>([]);
   const [isImportingCsv, setIsImportingCsv] = useState(false);
   const [confirmAction, setConfirmAction] = useState<"undo" | "clear" | null>(null);
   const [cartItems, setCartItems] = useState<CheckoutCartItem[]>([]);
-  const [isReviewingCart, setIsReviewingCart] = useState(false);
-  const deferredSearchTerm = useDeferredValue(searchTerm);
+  const [lastAddedKey, setLastAddedKey] = useState<string | null>(null);
 
   const localSummary = useMemo(() => summarizeSales(state.sales), [state.sales]);
   const localProductRows = useMemo(
@@ -158,11 +146,6 @@ export function AppShell() {
     () => getBundleComponentsMap(state.catalog),
     [state.catalog],
   );
-  const categories = useMemo(
-    () =>
-      ["all", ...new Set(state.catalog.products.map((product) => product.category).filter(Boolean))],
-    [state.catalog.products],
-  );
   const productSoldMap = useMemo(
     () => new Map(localProductRows.map((row) => [row.productId, row.totalQuantity])),
     [localProductRows],
@@ -171,6 +154,14 @@ export function AppShell() {
     () => new Map(localBundleRows.map((row) => [row.bundleId, row.quantity])),
     [localBundleRows],
   );
+  const activeProducts = useMemo(
+    () => state.catalog.products.filter((product) => product.isActive),
+    [state.catalog.products],
+  );
+  const activeBundles = useMemo(
+    () => state.catalog.bundles.filter((bundle) => bundle.isActive),
+    [state.catalog.bundles],
+  );
   const cartPreview = useMemo(() => {
     try {
       return buildCheckoutPreview(state.catalog, cartItems);
@@ -178,49 +169,8 @@ export function AppShell() {
       return EMPTY_CART_PREVIEW;
     }
   }, [cartItems, state.catalog]);
-
-  const normalizedSearch = deferredSearchTerm.trim().toLowerCase();
-  const visibleProducts = useMemo(
-    () =>
-      state.catalog.products.filter((product) => {
-        if (!showInactive && !product.isActive) {
-          return false;
-        }
-
-        if (categoryFilter !== "all" && product.category !== categoryFilter) {
-          return false;
-        }
-
-        if (!normalizedSearch) {
-          return true;
-        }
-
-        return (
-          product.name.toLowerCase().includes(normalizedSearch) ||
-          product.productId.toLowerCase().includes(normalizedSearch)
-        );
-      }),
-    [categoryFilter, normalizedSearch, showInactive, state.catalog.products],
-  );
-  const visibleBundles = useMemo(
-    () =>
-      state.catalog.bundles.filter((bundle) => {
-        if (!showInactive && !bundle.isActive) {
-          return false;
-        }
-
-        if (!normalizedSearch) {
-          return true;
-        }
-
-        return (
-          bundle.bundleName.toLowerCase().includes(normalizedSearch) ||
-          bundle.bundleId.toLowerCase().includes(normalizedSearch)
-        );
-      }),
-    [normalizedSearch, showInactive, state.catalog.bundles],
-  );
   const canUndo = state.outbox.length === 0 && state.lastUndoSaleIds.length > 0;
+  const cartBadgeCount = cartPreview.summary.totalQuantity;
 
   useEffect(() => {
     setCartItems((current) =>
@@ -231,6 +181,20 @@ export function AppShell() {
       ),
     );
   }, [bundleMap, productMap]);
+
+  useEffect(() => {
+    if (!lastAddedKey) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setLastAddedKey(null);
+    }, 900);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [lastAddedKey]);
 
   async function handleCsvImport() {
     setIsImportingCsv(true);
@@ -273,7 +237,11 @@ export function AppShell() {
 
       return updateCartQuantity(current, itemType, itemId, (target?.quantity ?? 0) + 1);
     });
-    setIsReviewingCart(false);
+    setLastAddedKey(`${itemType}:${itemId}`);
+
+    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+      navigator.vibrate(20);
+    }
   }
 
   function handleIncreaseCartItem(
@@ -311,7 +279,6 @@ export function AppShell() {
 
   function handleClearCart() {
     setCartItems([]);
-    setIsReviewingCart(false);
   }
 
   function handleCheckoutCart() {
@@ -319,7 +286,6 @@ export function AppShell() {
 
     if (completed) {
       setCartItems([]);
-      setIsReviewingCart(false);
     }
   }
 
@@ -330,7 +296,7 @@ export function AppShell() {
   return (
     <div className="min-h-screen text-zinc-50">
       <div className="mx-auto flex min-h-screen max-w-5xl flex-col px-3 pb-24 pt-3 sm:px-6 sm:pt-5">
-        <header className="rounded-[32px] border border-white/10 bg-[rgba(18,18,24,0.94)] p-4 shadow-[0_16px_60px_rgba(0,0,0,0.28)]">
+        <header className="rounded-[32px] border border-white/12 bg-[linear-gradient(180deg,rgba(25,25,31,0.97),rgba(16,16,21,0.97))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_20px_60px_rgba(0,0,0,0.32)]">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.24em] text-orange-300">
@@ -356,9 +322,9 @@ export function AppShell() {
             <MetricCard label="今日成本" value={formatMoney(localSummary.costCents)} />
             <MetricCard label="今日淨利" value={formatMoney(localSummary.profitCents)} />
             <MetricCard
-              label="待同步筆數"
-              value={state.outbox.length.toString()}
-              hint={`${state.sales.length} 筆本地銷售`}
+              label="購物車件數"
+              value={cartBadgeCount.toString()}
+              hint={`${cartPreview.summary.lineCount} 個品項`}
             />
           </div>
 
@@ -388,13 +354,13 @@ export function AppShell() {
         </header>
 
         {!isOnline ? (
-          <div className="mt-3 rounded-3xl border border-amber-500/25 bg-amber-500/10 p-4 text-sm font-medium text-amber-100">
+          <div className="mt-3 rounded-3xl border border-amber-400/25 bg-amber-500/10 p-4 text-sm font-medium text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
             <div className="flex items-start gap-3">
               <WifiOff className="mt-0.5 h-5 w-5 shrink-0" />
               <div>
                 <p className="font-black">目前離線模式</p>
                 <p className="mt-1">
-                  你仍可繼續加入購物車並完成本地收銀。等網路恢復後，再到同步分頁上傳營業額。
+                  仍可繼續點選商品加入購物車並完成本地收銀。等網路恢復後，再到同步分頁上傳營業額。
                 </p>
               </div>
             </div>
@@ -419,31 +385,25 @@ export function AppShell() {
         <main className="mt-3 flex-1 sm:mt-4">
           {activeTab === "cashier" ? (
             <CashierSection
-              searchTerm={searchTerm}
-              onSearchTermChange={setSearchTerm}
-              itemFilter={itemFilter}
-              onItemFilterChange={setItemFilter}
-              categoryFilter={categoryFilter}
-              onCategoryFilterChange={setCategoryFilter}
-              showInactive={showInactive}
-              onToggleShowInactive={() => setShowInactive((current) => !current)}
-              categories={categories}
-              products={visibleProducts}
-              bundles={visibleBundles}
+              products={activeProducts}
+              bundles={activeBundles}
               productMap={productMap}
               bundleComponentsMap={bundleComponentsMap}
               productSoldMap={productSoldMap}
               bundleSoldMap={bundleSoldMap}
-              cartPreview={cartPreview}
-              isReviewingCart={isReviewingCart}
+              lastAddedKey={lastAddedKey}
               onAddToCart={handleAddToCart}
+            />
+          ) : null}
+          {activeTab === "cart" ? (
+            <CartSection
+              cartPreview={cartPreview}
               onIncreaseCartItem={handleIncreaseCartItem}
               onDecreaseCartItem={handleDecreaseCartItem}
               onRemoveCartItem={handleRemoveCartItem}
               onClearCart={handleClearCart}
-              onReviewCart={() => setIsReviewingCart(true)}
-              onBackToCart={() => setIsReviewingCart(false)}
               onCheckoutCart={handleCheckoutCart}
+              onGoCashier={() => setActiveTab("cashier")}
             />
           ) : null}
           {activeTab === "products" ? (
@@ -497,11 +457,32 @@ export function AppShell() {
           ) : null}
         </main>
 
-        <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[rgba(8,8,12,0.95)] px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur">
-          <div className="mx-auto grid max-w-5xl grid-cols-6 gap-1">
+        <button
+          type="button"
+          onClick={() => setActiveTab("cart")}
+          className={cn(
+            "fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 z-50 inline-flex h-16 w-16 items-center justify-center rounded-full border shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_20px_50px_rgba(0,0,0,0.34)] transition",
+            activeTab === "cart"
+              ? "border-orange-300/50 bg-orange-400 text-zinc-950"
+              : "border-white/12 bg-[linear-gradient(180deg,rgba(28,28,36,0.98),rgba(16,16,22,0.98))] text-zinc-50",
+          )}
+          aria-label="開啟購物車"
+        >
+          <ShoppingCart className="h-6 w-6" />
+          {cartBadgeCount > 0 ? (
+            <span className="absolute -right-1 -top-1 inline-flex min-h-6 min-w-6 items-center justify-center rounded-full bg-rose-600 px-1.5 text-[11px] font-black text-white ring-2 ring-zinc-950">
+              {cartBadgeCount > 99 ? "99+" : cartBadgeCount}
+            </span>
+          ) : null}
+        </button>
+
+        <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[rgba(8,8,12,0.96)] px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur">
+          <div className="mx-auto flex max-w-5xl gap-1 overflow-x-auto">
             {TAB_ITEMS.map((tab) => {
               const icon =
                 tab.id === "cashier" ? (
+                  <ShoppingCart className="h-5 w-5" />
+                ) : tab.id === "cart" ? (
                   <ShoppingCart className="h-5 w-5" />
                 ) : tab.id === "products" ? (
                   <Package className="h-5 w-5" />
@@ -525,14 +506,19 @@ export function AppShell() {
                     })
                   }
                   className={cn(
-                    "flex min-h-16 flex-col items-center justify-center rounded-2xl text-[11px] font-bold",
+                    "relative flex min-h-16 min-w-[84px] flex-col items-center justify-center rounded-2xl px-3 text-[11px] font-bold",
                     activeTab === tab.id
                       ? "bg-zinc-100 text-zinc-950"
-                      : "text-zinc-500",
+                      : "border border-transparent text-zinc-500",
                   )}
                 >
                   {icon}
                   <span className="mt-1">{tab.label}</span>
+                  {tab.id === "cart" && cartBadgeCount > 0 ? (
+                    <span className="absolute right-2 top-2 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-black text-white">
+                      {cartBadgeCount > 99 ? "99+" : cartBadgeCount}
+                    </span>
+                  ) : null}
                 </button>
               );
             })}
@@ -543,7 +529,7 @@ export function AppShell() {
       {confirmAction === "undo" ? (
         <ConfirmDialog
           title="撤銷上一輪收銀"
-          description="會把上一輪尚未同步的整筆購物車收銀一起撤回。若資料已進入同步批次，請先完成同步或重新整理狀態。"
+          description="會把上一輪尚未同步的整筆收銀一起撤回。若資料已經進入同步批次，請先完成同步或重新整理狀態。"
           confirmLabel="確認撤銷"
           confirmTone="neutral"
           onCancel={() => setConfirmAction(null)}
