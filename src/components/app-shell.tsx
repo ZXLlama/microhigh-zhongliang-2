@@ -212,8 +212,8 @@ export function AppShell() {
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#fff7ed,_#f8fafc_58%)] text-zinc-900">
-      <div className="mx-auto flex min-h-screen max-w-5xl flex-col px-3 pb-24 pt-4 sm:px-6">
-        <header className="sticky top-3 z-30 rounded-[32px] border border-white/70 bg-white/90 p-4 shadow-lg backdrop-blur">
+      <div className="mx-auto flex min-h-screen max-w-5xl flex-col px-3 pb-24 pt-3 sm:px-6 sm:pt-5">
+        <header className="rounded-[32px] border border-white/70 bg-white/90 p-4 shadow-sm">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.24em] text-amber-700">
@@ -308,7 +308,7 @@ export function AppShell() {
           </div>
         ) : null}
 
-        <main className="mt-4 flex-1">
+        <main className="mt-3 flex-1 sm:mt-4">
           {activeTab === "cashier" ? (
             <CashierSection
               searchTerm={searchTerm}
