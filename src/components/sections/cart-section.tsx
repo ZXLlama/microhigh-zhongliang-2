@@ -62,17 +62,6 @@ export function CartSection({
           </div>
         ) : (
           <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <MetricCard
-                label="本輪小計"
-                value={formatMoney(cartPreview.summary.revenueCents)}
-              />
-              <MetricCard
-                label="本輪淨利"
-                value={formatMoney(cartPreview.summary.profitCents)}
-              />
-            </div>
-
             {cartPreview.lines.map((line) => (
               <div
                 key={line.key}
@@ -156,6 +145,20 @@ export function CartSection({
             <div className="grid grid-cols-2 gap-3">
               <MetricCard label="品項數" value={cartPreview.summary.lineCount.toString()} />
               <MetricCard label="總件數" value={cartPreview.summary.totalQuantity.toString()} />
+            </div>
+
+            <div className="rounded-[28px] border border-orange-300/35 bg-[linear-gradient(180deg,rgba(251,146,60,0.2),rgba(234,88,12,0.14))] px-5 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_18px_40px_rgba(0,0,0,0.28)]">
+              <p className="text-sm font-bold tracking-[0.08em] text-orange-100">
+                本輪小計
+              </p>
+              <div className="mt-2 flex items-end justify-between gap-3">
+                <p className="text-4xl font-black tracking-tight text-white sm:text-[2.75rem]">
+                  {formatMoney(cartPreview.summary.revenueCents)}
+                </p>
+                <p className="pb-1 text-xs font-semibold text-orange-100/80">
+                  結帳前請再確認商品與數量
+                </p>
+              </div>
             </div>
 
             <div className="flex flex-wrap gap-3">
