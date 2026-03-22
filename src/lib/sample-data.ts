@@ -27,17 +27,17 @@ export const SAMPLE_PRODUCTS: Product[] = [
     priceCents: 1800,
     costCents: 800,
     profitCents: 1000,
-    category: "小點",
+    category: "小食",
     isActive: true,
     sortOrder: 30,
   },
   {
     productId: "brownie",
-    name: "米香布朗尼",
+    name: "布朗尼",
     priceCents: 4500,
     costCents: 1800,
     profitCents: 2700,
-    category: "甜點",
+    category: "點心",
     isActive: true,
     sortOrder: 40,
   },
@@ -56,7 +56,7 @@ export const SAMPLE_PRODUCTS: Product[] = [
 export const SAMPLE_BUNDLES: Bundle[] = [
   {
     bundleId: "breakfast-set",
-    bundleName: "早餐補給組",
+    bundleName: "早餐套餐",
     bundlePriceCents: 7500,
     bundleCostCents: 4000,
     bundleProfitCents: 3500,
@@ -65,7 +65,7 @@ export const SAMPLE_BUNDLES: Bundle[] = [
   },
   {
     bundleId: "dessert-tea-set",
-    bundleName: "甜點紅茶組",
+    bundleName: "點心飲料組",
     bundlePriceCents: 7200,
     bundleCostCents: 3300,
     bundleProfitCents: 3900,

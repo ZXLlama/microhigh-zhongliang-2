@@ -1,11 +1,18 @@
 "use client";
 
-import { startTransition, useDeferredValue, useMemo, useState } from "react";
+import {
+  startTransition,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import {
   BarChart3,
   Boxes,
   CloudUpload,
   Database,
+  Package,
   ShoppingCart,
   Trash2,
   Undo2,
@@ -27,14 +34,15 @@ import {
   toneClass,
 } from "@/components/ui/shell-ui";
 import { TAB_ITEMS, type TabId } from "@/lib/constants";
-import { getBundleComponentsMap, getProductMap } from "@/lib/config";
+import { getBundleComponentsMap, getBundleMap, getProductMap } from "@/lib/config";
 import { formatMoney } from "@/lib/money";
 import {
   buildBundleSummaries,
+  buildCheckoutPreview,
   buildProductSummaries,
   summarizeSales,
 } from "@/lib/sales";
-import type { CsvImportIssue } from "@/lib/types";
+import type { CheckoutCartItem, CsvImportIssue } from "@/lib/types";
 import { cn, formatDateTime } from "@/lib/utils";
 
 type ItemFilter = "all" | "product" | "bundle";
@@ -51,12 +59,50 @@ const EMPTY_FILES: CsvFileMap = {
   bundleComponents: null,
 };
 
+const EMPTY_CART_PREVIEW = {
+  lines: [],
+  summary: {
+    lineCount: 0,
+    totalQuantity: 0,
+    revenueCents: 0,
+    costCents: 0,
+    profitCents: 0,
+  },
+};
+
 async function fileToText(file: File | null): Promise<string> {
   if (!file) {
-    throw new Error("請先選擇完整的 CSV 檔案");
+    throw new Error("請先選擇完整的 CSV 檔案。");
   }
 
   return file.text();
+}
+
+function updateCartQuantity(
+  items: CheckoutCartItem[],
+  itemType: CheckoutCartItem["itemType"],
+  itemId: string,
+  nextQuantity: number,
+): CheckoutCartItem[] {
+  const targetIndex = items.findIndex(
+    (item) => item.itemType === itemType && item.itemId === itemId,
+  );
+
+  if (targetIndex < 0) {
+    if (nextQuantity <= 0) {
+      return items;
+    }
+
+    return [...items, { itemType, itemId, quantity: nextQuantity }];
+  }
+
+  if (nextQuantity <= 0) {
+    return items.filter((_, index) => index !== targetIndex);
+  }
+
+  return items.map((item, index) =>
+    index === targetIndex ? { ...item, quantity: nextQuantity } : item,
+  );
 }
 
 export function AppShell() {
@@ -71,11 +117,9 @@ export function AppShell() {
     health,
     notice,
     dismissNotice,
-    addProductSale,
-    addBundleSale,
+    checkoutCart,
     undoLastSale,
     clearLocalSales,
-    toggleFavorite,
     importCatalogCsv,
     syncCatalog,
     refreshSpreadsheetSnapshot,
@@ -95,6 +139,8 @@ export function AppShell() {
   const [importIssues, setImportIssues] = useState<CsvImportIssue[]>([]);
   const [isImportingCsv, setIsImportingCsv] = useState(false);
   const [confirmAction, setConfirmAction] = useState<"undo" | "clear" | null>(null);
+  const [cartItems, setCartItems] = useState<CheckoutCartItem[]>([]);
+  const [isReviewingCart, setIsReviewingCart] = useState(false);
   const deferredSearchTerm = useDeferredValue(searchTerm);
 
   const localSummary = useMemo(() => summarizeSales(state.sales), [state.sales]);
@@ -107,6 +153,7 @@ export function AppShell() {
     [state.catalog, state.sales],
   );
   const productMap = useMemo(() => getProductMap(state.catalog), [state.catalog]);
+  const bundleMap = useMemo(() => getBundleMap(state.catalog), [state.catalog]);
   const bundleComponentsMap = useMemo(
     () => getBundleComponentsMap(state.catalog),
     [state.catalog],
@@ -117,16 +164,20 @@ export function AppShell() {
     [state.catalog.products],
   );
   const productSoldMap = useMemo(
-    () =>
-      new Map(
-        localProductRows.map((row) => [row.productId, row.totalQuantity]),
-      ),
+    () => new Map(localProductRows.map((row) => [row.productId, row.totalQuantity])),
     [localProductRows],
   );
   const bundleSoldMap = useMemo(
     () => new Map(localBundleRows.map((row) => [row.bundleId, row.quantity])),
     [localBundleRows],
   );
+  const cartPreview = useMemo(() => {
+    try {
+      return buildCheckoutPreview(state.catalog, cartItems);
+    } catch {
+      return EMPTY_CART_PREVIEW;
+    }
+  }, [cartItems, state.catalog]);
 
   const normalizedSearch = deferredSearchTerm.trim().toLowerCase();
   const visibleProducts = useMemo(
@@ -169,9 +220,17 @@ export function AppShell() {
       }),
     [normalizedSearch, showInactive, state.catalog.bundles],
   );
-  const quickKeys = [...state.favorites, ...state.recentItemKeys].filter(
-    (value, index, values) => values.indexOf(value) === index,
-  );
+  const canUndo = state.outbox.length === 0 && state.lastUndoSaleIds.length > 0;
+
+  useEffect(() => {
+    setCartItems((current) =>
+      current.filter((item) =>
+        item.itemType === "product"
+          ? productMap.has(item.itemId)
+          : bundleMap.has(item.itemId),
+      ),
+    );
+  }, [bundleMap, productMap]);
 
   async function handleCsvImport() {
     setIsImportingCsv(true);
@@ -206,25 +265,85 @@ export function AppShell() {
     importBackupJson(await file.text());
   }
 
+  function handleAddToCart(itemType: CheckoutCartItem["itemType"], itemId: string) {
+    setCartItems((current) => {
+      const target = current.find(
+        (item) => item.itemType === itemType && item.itemId === itemId,
+      );
+
+      return updateCartQuantity(current, itemType, itemId, (target?.quantity ?? 0) + 1);
+    });
+    setIsReviewingCart(false);
+  }
+
+  function handleIncreaseCartItem(
+    itemType: CheckoutCartItem["itemType"],
+    itemId: string,
+  ) {
+    setCartItems((current) => {
+      const target = current.find(
+        (item) => item.itemType === itemType && item.itemId === itemId,
+      );
+
+      return updateCartQuantity(current, itemType, itemId, (target?.quantity ?? 0) + 1);
+    });
+  }
+
+  function handleDecreaseCartItem(
+    itemType: CheckoutCartItem["itemType"],
+    itemId: string,
+  ) {
+    setCartItems((current) => {
+      const target = current.find(
+        (item) => item.itemType === itemType && item.itemId === itemId,
+      );
+
+      return updateCartQuantity(current, itemType, itemId, (target?.quantity ?? 0) - 1);
+    });
+  }
+
+  function handleRemoveCartItem(
+    itemType: CheckoutCartItem["itemType"],
+    itemId: string,
+  ) {
+    setCartItems((current) => updateCartQuantity(current, itemType, itemId, 0));
+  }
+
+  function handleClearCart() {
+    setCartItems([]);
+    setIsReviewingCart(false);
+  }
+
+  function handleCheckoutCart() {
+    const completed = checkoutCart(cartItems);
+
+    if (completed) {
+      setCartItems([]);
+      setIsReviewingCart(false);
+    }
+  }
+
   if (!isHydrated) {
     return <LoadingShell />;
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#fff7ed,_#f8fafc_58%)] text-zinc-900">
+    <div className="min-h-screen text-zinc-50">
       <div className="mx-auto flex min-h-screen max-w-5xl flex-col px-3 pb-24 pt-3 sm:px-6 sm:pt-5">
-        <header className="rounded-[32px] border border-white/70 bg-white/90 p-4 shadow-sm">
+        <header className="rounded-[32px] border border-white/10 bg-[rgba(18,18,24,0.94)] p-4 shadow-[0_16px_60px_rgba(0,0,0,0.28)]">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.24em] text-amber-700">
+              <p className="text-xs font-bold uppercase tracking-[0.24em] text-orange-300">
                 Mobile-First POS
               </p>
-              <h1 className="mt-1 text-2xl font-black tracking-tight text-zinc-950">
+              <h1 className="mt-1 text-2xl font-black tracking-tight text-zinc-50">
                 微high忠糧 2.0
               </h1>
-              <p className="mt-1 text-sm text-zinc-500">裝置 ID：{state.deviceId}</p>
+              <p className="mt-1 break-all text-sm text-zinc-500">
+                裝置 ID：{state.deviceId}
+              </p>
             </div>
-            <div className="flex flex-col items-end gap-2">
+            <div className="flex flex-col items-end gap-2 text-right">
               <StatusPill label={state.syncInfo.status} status={state.syncInfo.status} />
               <p className="text-xs text-zinc-500">
                 最後同步：{formatDateTime(state.syncInfo.lastSyncAt)}
@@ -238,8 +357,8 @@ export function AppShell() {
             <MetricCard label="今日淨利" value={formatMoney(localSummary.profitCents)} />
             <MetricCard
               label="待同步筆數"
-              value={state.sales.length.toString()}
-              hint={`${state.outbox.length} 個待送批次`}
+              value={state.outbox.length.toString()}
+              hint={`${state.sales.length} 筆本地銷售`}
             />
           </div>
 
@@ -247,46 +366,35 @@ export function AppShell() {
             <button
               type="button"
               onClick={() => setConfirmAction("undo")}
-              disabled={state.outbox.length > 0 || !state.lastUndoSaleId}
-              className="min-h-12 rounded-2xl border border-zinc-200 bg-white px-4 text-sm font-bold text-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={!canUndo}
+              className="min-h-12 rounded-2xl border border-white/10 bg-white/5 px-4 text-sm font-bold text-zinc-100 disabled:opacity-40"
             >
               <span className="inline-flex items-center gap-2">
                 <Undo2 className="h-4 w-4" />
-                撤銷最後一筆
+                撤銷上一輪
               </span>
             </button>
             <button
               type="button"
               onClick={() => setConfirmAction("clear")}
-              className="min-h-12 rounded-2xl border border-rose-200 bg-rose-50 px-4 text-sm font-bold text-rose-700"
+              className="min-h-12 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 text-sm font-bold text-rose-200"
             >
               <span className="inline-flex items-center gap-2">
                 <Trash2 className="h-4 w-4" />
                 清除當日資料
               </span>
             </button>
-            <button
-              type="button"
-              onClick={() => void uploadPendingSales()}
-              disabled={isUploading || state.sales.length === 0}
-              className="min-h-12 rounded-2xl bg-zinc-950 px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <span className="inline-flex items-center gap-2">
-                <CloudUpload className="h-4 w-4" />
-                {isUploading ? "同步中..." : "上傳營業額"}
-              </span>
-            </button>
           </div>
         </header>
 
         {!isOnline ? (
-          <div className="mt-3 rounded-3xl border border-amber-200 bg-amber-50 p-4 text-sm font-medium text-amber-800">
+          <div className="mt-3 rounded-3xl border border-amber-500/25 bg-amber-500/10 p-4 text-sm font-medium text-amber-100">
             <div className="flex items-start gap-3">
               <WifiOff className="mt-0.5 h-5 w-5 shrink-0" />
               <div>
-                <p className="font-black">離線模式</p>
+                <p className="font-black">目前離線模式</p>
                 <p className="mt-1">
-                  現在仍可本地記錄銷售；上傳試算表與抓取最新資料會暫停，資料不會被刪除。
+                  你仍可繼續加入購物車並完成本地收銀。等網路恢復後，再到同步分頁上傳營業額。
                 </p>
               </div>
             </div>
@@ -320,17 +428,22 @@ export function AppShell() {
               showInactive={showInactive}
               onToggleShowInactive={() => setShowInactive((current) => !current)}
               categories={categories}
-              quickKeys={quickKeys}
-              favorites={state.favorites}
               products={visibleProducts}
               bundles={visibleBundles}
               productMap={productMap}
               bundleComponentsMap={bundleComponentsMap}
               productSoldMap={productSoldMap}
               bundleSoldMap={bundleSoldMap}
-              onAddProductSale={addProductSale}
-              onAddBundleSale={addBundleSale}
-              onToggleFavorite={toggleFavorite}
+              cartPreview={cartPreview}
+              isReviewingCart={isReviewingCart}
+              onAddToCart={handleAddToCart}
+              onIncreaseCartItem={handleIncreaseCartItem}
+              onDecreaseCartItem={handleDecreaseCartItem}
+              onRemoveCartItem={handleRemoveCartItem}
+              onClearCart={handleClearCart}
+              onReviewCart={() => setIsReviewingCart(true)}
+              onBackToCart={() => setIsReviewingCart(false)}
+              onCheckoutCart={handleCheckoutCart}
             />
           ) : null}
           {activeTab === "products" ? (
@@ -384,14 +497,14 @@ export function AppShell() {
           ) : null}
         </main>
 
-        <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-zinc-200 bg-white/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur">
+        <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[rgba(8,8,12,0.95)] px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur">
           <div className="mx-auto grid max-w-5xl grid-cols-6 gap-1">
             {TAB_ITEMS.map((tab) => {
               const icon =
                 tab.id === "cashier" ? (
                   <ShoppingCart className="h-5 w-5" />
                 ) : tab.id === "products" ? (
-                  <ShoppingCart className="h-5 w-5" />
+                  <Package className="h-5 w-5" />
                 ) : tab.id === "bundles" ? (
                   <Boxes className="h-5 w-5" />
                 ) : tab.id === "today" ? (
@@ -413,7 +526,9 @@ export function AppShell() {
                   }
                   className={cn(
                     "flex min-h-16 flex-col items-center justify-center rounded-2xl text-[11px] font-bold",
-                    activeTab === tab.id ? "bg-zinc-950 text-white" : "text-zinc-500",
+                    activeTab === tab.id
+                      ? "bg-zinc-100 text-zinc-950"
+                      : "text-zinc-500",
                   )}
                 >
                   {icon}
@@ -427,8 +542,8 @@ export function AppShell() {
 
       {confirmAction === "undo" ? (
         <ConfirmDialog
-          title="確認撤銷最後一筆"
-          description="只有尚未進入同步批次的最後一筆本地銷售可以撤銷。"
+          title="撤銷上一輪收銀"
+          description="會把上一輪尚未同步的整筆購物車收銀一起撤回。若資料已進入同步批次，請先完成同步或重新整理狀態。"
           confirmLabel="確認撤銷"
           confirmTone="neutral"
           onCancel={() => setConfirmAction(null)}
@@ -441,9 +556,9 @@ export function AppShell() {
 
       {confirmAction === "clear" ? (
         <ConfirmDialog
-          title="確認清除當日資料"
-          description="這會刪除本地 IndexedDB 裡的今日銷售與待同步批次。建議先匯出 JSON 備份。"
-          confirmLabel="我知道，清除資料"
+          title="清除當日本地資料"
+          description="這會刪除目前瀏覽器中的今日銷售與待同步批次。若需要保留資料，請先在同步分頁匯出 JSON 備份。"
+          confirmLabel="確認清除"
           onCancel={() => setConfirmAction(null)}
           onConfirm={() => {
             clearLocalSales();

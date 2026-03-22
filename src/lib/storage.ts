@@ -1,10 +1,6 @@
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
 
-import {
-  LOCAL_DB_KEY,
-  LOCAL_DB_NAME,
-  LOCAL_DB_STORE,
-} from "@/lib/constants";
+import { LOCAL_DB_KEY, LOCAL_DB_NAME, LOCAL_DB_STORE } from "@/lib/constants";
 import { assertBackupPayload } from "@/lib/guards";
 import type { BackupPayload, LocalState } from "@/lib/types";
 import { safeJsonParse } from "@/lib/utils";
@@ -20,7 +16,7 @@ let databasePromise: Promise<IDBPDatabase<PosDb>> | null = null;
 
 async function getDatabase() {
   if (typeof window === "undefined" || typeof indexedDB === "undefined") {
-    throw new Error("IndexedDB 僅能在瀏覽器環境使用");
+    throw new Error("IndexedDB 目前不可用");
   }
 
   if (!databasePromise) {

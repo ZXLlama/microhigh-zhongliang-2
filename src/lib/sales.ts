@@ -4,6 +4,9 @@ import type {
   BundleComponentBreakdownItem,
   BundleSummaryRow,
   Catalog,
+  CheckoutCartItem,
+  CheckoutPreview,
+  CheckoutPreviewLine,
   LocalSession,
   Product,
   ProductSummaryRow,
@@ -137,6 +140,54 @@ export function createBundleSaleEvent(params: {
   };
 }
 
+export function createSaleEventsFromCart(
+  catalog: Catalog,
+  items: CheckoutCartItem[],
+  now = new Date().toISOString(),
+): SaleEvent[] {
+  const sales: SaleEvent[] = [];
+
+  for (const item of items) {
+    if (item.quantity <= 0) {
+      continue;
+    }
+
+    if (item.itemType === "product") {
+      const product = findProduct(catalog, item.itemId);
+
+      if (!product) {
+        throw new Error(`找不到商品 ${item.itemId}`);
+      }
+
+      sales.push(
+        createProductSaleEvent({
+          product,
+          quantity: item.quantity,
+          now,
+        }),
+      );
+      continue;
+    }
+
+    const bundle = findBundle(catalog, item.itemId);
+
+    if (!bundle) {
+      throw new Error(`找不到組合包 ${item.itemId}`);
+    }
+
+    sales.push(
+      createBundleSaleEvent({
+        bundle,
+        catalog,
+        quantity: item.quantity,
+        now,
+      }),
+    );
+  }
+
+  return sales;
+}
+
 export function buildProductSummaries(
   catalog: Catalog,
   sales: SaleEvent[],
@@ -257,6 +308,88 @@ export function buildBundleSummaries(
   });
 }
 
+function buildCheckoutPreviewLine(
+  catalog: Catalog,
+  item: CheckoutCartItem,
+): CheckoutPreviewLine | null {
+  if (item.quantity <= 0) {
+    return null;
+  }
+
+  if (item.itemType === "product") {
+    const product = findProduct(catalog, item.itemId);
+
+    if (!product) {
+      return null;
+    }
+
+    return {
+      key: itemKey(item.itemType, item.itemId),
+      itemType: item.itemType,
+      itemId: item.itemId,
+      name: product.name,
+      badgeLabel: "單品",
+      subtitle: product.category || "未分類",
+      quantity: item.quantity,
+      unitPriceCents: product.priceCents,
+      subtotalCents: product.priceCents * item.quantity,
+      components: [],
+    };
+  }
+
+  const bundle = findBundle(catalog, item.itemId);
+
+  if (!bundle) {
+    return null;
+  }
+
+  const components = (getBundleComponentsMap(catalog).get(bundle.bundleId) ?? []).map(
+    (component) => {
+      const product = findProduct(catalog, component.productId);
+      return `${product?.name ?? component.productId} x${component.quantity}`;
+    },
+  );
+
+  return {
+    key: itemKey(item.itemType, item.itemId),
+    itemType: item.itemType,
+    itemId: item.itemId,
+    name: bundle.bundleName,
+    badgeLabel: "組合包",
+    subtitle: components.length > 0 ? `${components.length} 項內容物` : "未設定內容物",
+    quantity: item.quantity,
+    unitPriceCents: bundle.bundlePriceCents,
+    subtotalCents: bundle.bundlePriceCents * item.quantity,
+    components,
+  };
+}
+
+export function buildCheckoutPreview(
+  catalog: Catalog,
+  items: CheckoutCartItem[],
+): CheckoutPreview {
+  const sales = createSaleEventsFromCart(
+    catalog,
+    items.filter((item) => item.quantity > 0),
+    new Date().toISOString(),
+  );
+  const summary = summarizeSales(sales);
+  const lines = items
+    .map((item) => buildCheckoutPreviewLine(catalog, item))
+    .filter((line): line is CheckoutPreviewLine => Boolean(line));
+
+  return {
+    lines,
+    summary: {
+      lineCount: lines.length,
+      totalQuantity: lines.reduce((total, line) => total + line.quantity, 0),
+      revenueCents: summary.revenueCents,
+      costCents: summary.costCents,
+      profitCents: summary.profitCents,
+    },
+  };
+}
+
 export function buildSpreadsheetSnapshot(params: {
   catalog: Catalog;
   sales: SaleEvent[];
@@ -270,31 +403,6 @@ export function buildSpreadsheetSnapshot(params: {
     bundleSummaries: buildBundleSummaries(params.catalog, params.sales),
     syncLogs: params.syncLogs ?? [],
   };
-}
-
-export function getRecommendedItemKeys(catalog: Catalog, sales: SaleEvent[]): string[] {
-  const counts = new Map<string, number>();
-
-  for (const sale of sales) {
-    const key = itemKey(sale.itemType, sale.itemId);
-    counts.set(key, (counts.get(key) ?? 0) + sale.quantity);
-  }
-
-  const fallback = [
-    ...catalog.products
-      .filter((product) => product.isActive)
-      .map((product) => itemKey("product", product.productId)),
-    ...catalog.bundles
-      .filter((bundle) => bundle.isActive)
-      .map((bundle) => itemKey("bundle", bundle.bundleId)),
-  ];
-
-  return [...counts.entries()]
-    .sort((left, right) => right[1] - left[1])
-    .map(([key]) => key)
-    .concat(fallback)
-    .filter((value, index, values) => values.indexOf(value) === index)
-    .slice(0, 8);
 }
 
 export function createNextSession(deviceId: string, now = new Date().toISOString()): LocalSession {

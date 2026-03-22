@@ -17,20 +17,17 @@ export function BundlesSection({
 }: BundlesSectionProps) {
   return (
     <div className="space-y-4">
-      <SectionCard
-        title="組合包主檔"
-        subtitle={`目前共 ${bundles.length} 個組合包。`}
-      >
+      <SectionCard title="組合包主檔" subtitle={`目前共有 ${bundles.length} 個組合包。`}>
         <div className="space-y-3">
           {bundles.map((bundle) => (
             <div
               key={bundle.bundleId}
-              className="rounded-3xl border border-zinc-200 bg-zinc-50 p-4"
+              className="rounded-3xl border border-white/10 bg-white/5 p-4"
             >
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-lg font-black text-zinc-950">{bundle.bundleName}</p>
-                  <p className="mt-1 text-sm text-zinc-500">{bundle.bundleId}</p>
+                  <p className="text-lg font-black text-zinc-50">{bundle.bundleName}</p>
+                  <p className="mt-1 text-sm text-zinc-400">{bundle.bundleId}</p>
                 </div>
                 <StatusPill
                   label={bundle.isActive ? "啟用" : "停用"}
@@ -42,7 +39,7 @@ export function BundlesSection({
                 {(bundleComponentsMap.get(bundle.bundleId) ?? []).map((component) => (
                   <span
                     key={`${bundle.bundleId}-${component.productId}`}
-                    className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-zinc-700"
+                    className="rounded-full bg-black/20 px-3 py-1 text-xs font-semibold text-zinc-300"
                   >
                     {(productMap.get(component.productId)?.name ?? component.productId) +
                       ` x${component.quantity}`}

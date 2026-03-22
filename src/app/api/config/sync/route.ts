@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { getCatalogCounts } from "@/lib/sales";
 import { assertCatalog } from "@/lib/guards";
+import { getCatalogCounts } from "@/lib/sales";
 import { callGasAction } from "@/lib/gas-client";
 
 export async function POST(request: NextRequest) {
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      message: result.message ?? "設定已同步到試算表",
+      message: result.message ?? "商品設定已同步到試算表",
       productCount: result.productCount ?? counts.productCount,
       bundleCount: result.bundleCount ?? counts.bundleCount,
       bundleComponentCount:
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         ok: false,
-        error: error instanceof Error ? error.message : "設定同步失敗",
+        error: error instanceof Error ? error.message : "商品設定同步失敗",
       },
       {
         status: 500,

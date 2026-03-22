@@ -21,12 +21,12 @@ export function TodaySection({
 }: TodaySectionProps) {
   return (
     <div className="space-y-4">
-      <SectionCard title="今日摘要" subtitle="以下數字完全來自本地 IndexedDB。">
+      <SectionCard title="今日總覽" subtitle="以下統計來自目前瀏覽器內的本地銷售資料。">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-          <MetricCard label="單品數量" value={summary.productQuantity.toString()} />
-          <MetricCard label="組合包數量" value={summary.bundleQuantity.toString()} />
+          <MetricCard label="單品件數" value={summary.productQuantity.toString()} />
+          <MetricCard label="組合包組數" value={summary.bundleQuantity.toString()} />
           <MetricCard
-            label="組合包帶動"
+            label="組合包帶動件數"
             value={summary.bundleDrivenProductQuantity.toString()}
           />
           <MetricCard label="營收" value={formatMoney(summary.revenueCents)} />
@@ -35,28 +35,25 @@ export function TodaySection({
       </SectionCard>
 
       <SectionCard
-        title="商品累計"
-        subtitle="direct 代表單品直售；bundle-driven 代表被組合包帶動。"
+        title="商品統計"
+        subtitle="可同時看到單品直售與被組合包帶動的累計件數。"
       >
         <div className="space-y-3">
           {productRows.map((row) => (
             <div
               key={row.productId}
-              className="rounded-3xl border border-zinc-200 bg-zinc-50 p-4"
+              className="rounded-3xl border border-white/10 bg-white/5 p-4"
             >
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-lg font-black text-zinc-950">{row.name}</p>
-                  <p className="mt-1 text-sm text-zinc-500">{row.category}</p>
+                  <p className="text-lg font-black text-zinc-50">{row.name}</p>
+                  <p className="mt-1 text-sm text-zinc-400">{row.category}</p>
                 </div>
-                <p className="text-xl font-black text-zinc-950">{row.totalQuantity} 份</p>
+                <p className="text-xl font-black text-zinc-50">{row.totalQuantity} 件</p>
               </div>
               <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
                 <MetricCard label="直售" value={row.directQuantity.toString()} />
-                <MetricCard
-                  label="被組合包帶動"
-                  value={row.bundleDrivenQuantity.toString()}
-                />
+                <MetricCard label="組合包帶動" value={row.bundleDrivenQuantity.toString()} />
                 <MetricCard label="營收" value={formatMoney(row.revenueCents)} />
                 <MetricCard label="成本" value={formatMoney(row.costCents)} />
                 <MetricCard label="淨利" value={formatMoney(row.profitCents)} />
@@ -66,16 +63,16 @@ export function TodaySection({
         </div>
       </SectionCard>
 
-      <SectionCard title="組合包累計" subtitle="組合包收入與成本獨立統計。">
+      <SectionCard title="組合包統計" subtitle="顯示各組合包目前累積的銷量與金額。">
         <div className="space-y-3">
           {bundleRows.map((row) => (
             <div
               key={row.bundleId}
-              className="rounded-3xl border border-zinc-200 bg-zinc-50 p-4"
+              className="rounded-3xl border border-white/10 bg-white/5 p-4"
             >
               <div className="flex items-center justify-between gap-4">
-                <p className="text-lg font-black text-zinc-950">{row.name}</p>
-                <p className="text-xl font-black text-zinc-950">{row.quantity} 組</p>
+                <p className="text-lg font-black text-zinc-50">{row.name}</p>
+                <p className="text-xl font-black text-zinc-50">{row.quantity} 組</p>
               </div>
               <div className="mt-4 grid grid-cols-3 gap-3">
                 <MetricCard label="營收" value={formatMoney(row.revenueCents)} />

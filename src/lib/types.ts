@@ -176,7 +176,7 @@ export interface LocalState {
   syncInfo: SyncInfo;
   spreadsheetSnapshot: SpreadsheetSnapshot | null;
   currentSession: LocalSession;
-  lastUndoSaleId: string | null;
+  lastUndoSaleIds: string[];
 }
 
 export interface BackupPayload {
@@ -229,4 +229,36 @@ export interface HealthResponse {
   serverTime: string;
   gasConfigured: boolean;
   appName: string;
+}
+
+export interface CheckoutCartItem {
+  itemType: ItemType;
+  itemId: string;
+  quantity: number;
+}
+
+export interface CheckoutPreviewLine {
+  key: string;
+  itemType: ItemType;
+  itemId: string;
+  name: string;
+  badgeLabel: string;
+  subtitle: string;
+  quantity: number;
+  unitPriceCents: number;
+  subtotalCents: number;
+  components: string[];
+}
+
+export interface CheckoutPreviewSummary {
+  lineCount: number;
+  totalQuantity: number;
+  revenueCents: number;
+  costCents: number;
+  profitCents: number;
+}
+
+export interface CheckoutPreview {
+  lines: CheckoutPreviewLine[];
+  summary: CheckoutPreviewSummary;
 }

@@ -1,7 +1,7 @@
 function normalizeMoneyValue(input: string | number): string {
   if (typeof input === "number") {
     if (!Number.isFinite(input)) {
-      throw new Error("金額不是有效數字");
+      throw new Error("金額格式不正確");
     }
 
     return input.toString();

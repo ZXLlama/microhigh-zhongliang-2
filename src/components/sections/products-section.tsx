@@ -1,8 +1,8 @@
 "use client";
 
-import { SectionCard, EmptyPanel, MetricCard, StatusPill } from "@/components/ui/shell-ui";
-import type { CsvImportIssue, Product } from "@/lib/types";
+import { EmptyPanel, MetricCard, SectionCard, StatusPill } from "@/components/ui/shell-ui";
 import { formatMoney } from "@/lib/money";
+import type { CsvImportIssue, Product } from "@/lib/types";
 
 type CsvFileMap = {
   products: File | null;
@@ -31,15 +31,15 @@ export function ProductsSection({
     <div className="space-y-4">
       <SectionCard
         title="CSV 匯入"
-        subtitle="請依序選擇 products.csv、bundles.csv、bundle_components.csv，再按驗證與套用。"
+        subtitle="請依序上傳 products.csv、bundles.csv、bundle_components.csv。"
         action={
           <button
             type="button"
             onClick={() => void onImportCsv()}
             disabled={isImportingCsv}
-            className="min-h-11 rounded-2xl bg-zinc-950 px-4 text-sm font-bold text-white"
+            className="min-h-11 rounded-2xl bg-zinc-100 px-4 text-sm font-black text-zinc-950 disabled:opacity-40"
           >
-            {isImportingCsv ? "驗證中..." : "驗證並套用"}
+            {isImportingCsv ? "匯入中..." : "開始匯入"}
           </button>
         }
       >
@@ -51,9 +51,9 @@ export function ProductsSection({
           ].map(([key, label]) => (
             <label
               key={key}
-              className="block rounded-3xl border border-zinc-200 bg-zinc-50 p-4"
+              className="block rounded-3xl border border-white/10 bg-white/5 p-4"
             >
-              <span className="mb-2 block text-sm font-bold text-zinc-700">{label}</span>
+              <span className="mb-2 block text-sm font-bold text-zinc-200">{label}</span>
               <input
                 type="file"
                 accept=".csv,text/csv"
@@ -63,7 +63,7 @@ export function ProductsSection({
                     [key]: event.currentTarget.files?.[0] ?? null,
                   } as CsvFileMap)
                 }
-                className="block w-full text-sm text-zinc-600"
+                className="block w-full text-sm text-zinc-400 file:mr-3 file:rounded-xl file:border-0 file:bg-white/10 file:px-3 file:py-2 file:text-sm file:font-bold file:text-zinc-100"
               />
             </label>
           ))}
@@ -71,13 +71,13 @@ export function ProductsSection({
       </SectionCard>
 
       <SectionCard
-        title="CSV 驗證結果"
-        subtitle="warning 會提示你資料不一致；error 會阻止匯入。"
+        title="匯入結果"
+        subtitle="有 warning 可以先檢查；有 error 則不會套用新設定。"
       >
         {importIssues.length === 0 ? (
           <EmptyPanel
-            title="尚無匯入訊息"
-            description="選好三份 CSV 並驗證後，這裡會顯示錯誤列與警告列。"
+            title="尚未產生匯入結果"
+            description="上傳三個 CSV 後按開始匯入，系統會在這裡列出錯誤與警告。"
           />
         ) : (
           <div className="space-y-2">
@@ -86,8 +86,8 @@ export function ProductsSection({
                 key={`${issue.file}-${issue.row}-${index}`}
                 className={`rounded-2xl border px-4 py-3 text-sm ${
                   issue.severity === "error"
-                    ? "border-rose-200 bg-rose-50 text-rose-700"
-                    : "border-amber-200 bg-amber-50 text-amber-700"
+                    ? "border-rose-500/30 bg-rose-500/10 text-rose-200"
+                    : "border-amber-500/30 bg-amber-500/10 text-amber-100"
                 }`}
               >
                 <p className="font-black">
@@ -101,17 +101,17 @@ export function ProductsSection({
         )}
       </SectionCard>
 
-      <SectionCard title="商品主檔" subtitle={`目前共 ${products.length} 個商品。`}>
+      <SectionCard title="商品主檔" subtitle={`目前共有 ${products.length} 個商品。`}>
         <div className="space-y-3">
           {products.map((product) => (
             <div
               key={product.productId}
-              className="rounded-3xl border border-zinc-200 bg-zinc-50 p-4"
+              className="rounded-3xl border border-white/10 bg-white/5 p-4"
             >
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-lg font-black text-zinc-950">{product.name}</p>
-                  <p className="mt-1 text-sm text-zinc-500">
+                  <p className="text-lg font-black text-zinc-50">{product.name}</p>
+                  <p className="mt-1 text-sm text-zinc-400">
                     {product.productId} / {product.category}
                   </p>
                 </div>

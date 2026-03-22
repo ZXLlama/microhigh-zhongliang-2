@@ -19,14 +19,14 @@ export function SpreadsheetSection({
   return (
     <div className="space-y-4">
       <SectionCard
-        title="試算表累計"
-        subtitle="這裡顯示 Google 試算表端最後一次抓回的最新資料。"
+        title="試算表總表"
+        subtitle="這裡顯示目前 Google 試算表中最新的累計結果。"
         action={
           <button
             type="button"
             onClick={() => void onRefresh()}
             disabled={isRefreshing}
-            className="min-h-11 rounded-2xl bg-zinc-950 px-4 text-sm font-bold text-white"
+            className="min-h-11 rounded-2xl bg-zinc-100 px-4 text-sm font-black text-zinc-950 disabled:opacity-40"
           >
             {isRefreshing ? "抓取中..." : "重新抓取"}
           </button>
@@ -37,13 +37,13 @@ export function SpreadsheetSection({
             <MetricCard label="營收" value={formatMoney(snapshot.summary.revenueCents)} />
             <MetricCard label="成本" value={formatMoney(snapshot.summary.costCents)} />
             <MetricCard label="淨利" value={formatMoney(snapshot.summary.profitCents)} />
-            <MetricCard label="單品數量" value={snapshot.summary.productQuantity.toString()} />
-            <MetricCard label="組合包數量" value={snapshot.summary.bundleQuantity.toString()} />
+            <MetricCard label="單品件數" value={snapshot.summary.productQuantity.toString()} />
+            <MetricCard label="組合包組數" value={snapshot.summary.bundleQuantity.toString()} />
           </div>
         ) : (
           <EmptyPanel
             title="尚未抓取試算表資料"
-            description="按上方重新抓取，或先完成一次上傳營業額。"
+            description="請先到同步頁確認 GAS 與試算表已串接，然後再按重新抓取。"
           />
         )}
       </SectionCard>
@@ -51,28 +51,25 @@ export function SpreadsheetSection({
       {snapshot ? (
         <>
           <SectionCard
-            title="試算表商品累計"
-            subtitle={`抓取時間：${formatDateTime(snapshot.fetchedAt)}`}
+            title="商品累計"
+            subtitle={`最後抓取時間：${formatDateTime(snapshot.fetchedAt)}`}
           >
             <div className="space-y-3">
               {snapshot.productSummaries.map((row) => (
                 <div
                   key={row.productId}
-                  className="rounded-3xl border border-zinc-200 bg-zinc-50 p-4"
+                  className="rounded-3xl border border-white/10 bg-white/5 p-4"
                 >
                   <div className="flex items-center justify-between gap-4">
                     <div>
-                      <p className="text-lg font-black text-zinc-950">{row.name}</p>
-                      <p className="mt-1 text-sm text-zinc-500">{row.category}</p>
+                      <p className="text-lg font-black text-zinc-50">{row.name}</p>
+                      <p className="mt-1 text-sm text-zinc-400">{row.category}</p>
                     </div>
-                    <p className="text-xl font-black text-zinc-950">{row.totalQuantity} 份</p>
+                    <p className="text-xl font-black text-zinc-50">{row.totalQuantity} 件</p>
                   </div>
                   <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
                     <MetricCard label="直售" value={row.directQuantity.toString()} />
-                    <MetricCard
-                      label="組合包帶動"
-                      value={row.bundleDrivenQuantity.toString()}
-                    />
+                    <MetricCard label="組合包帶動" value={row.bundleDrivenQuantity.toString()} />
                     <MetricCard label="營收" value={formatMoney(row.revenueCents)} />
                     <MetricCard label="成本" value={formatMoney(row.costCents)} />
                     <MetricCard label="淨利" value={formatMoney(row.profitCents)} />
@@ -82,24 +79,24 @@ export function SpreadsheetSection({
             </div>
           </SectionCard>
 
-          <SectionCard title="最近同步紀錄" subtitle="用來確認 batchId 與處理時間。">
+          <SectionCard title="同步記錄" subtitle="可用來核對 batchId 與是否有重複入帳。">
             <div className="space-y-3">
               {snapshot.syncLogs.map((log) => (
                 <div
                   key={log.batchId}
-                  className="rounded-3xl border border-zinc-200 bg-zinc-50 p-4"
+                  className="rounded-3xl border border-white/10 bg-white/5 p-4"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <p className="font-black text-zinc-950">{log.batchId}</p>
+                    <p className="font-black text-zinc-50">{log.batchId}</p>
                     <StatusPill label={log.status} status={log.status.toLowerCase()} />
                   </div>
-                  <p className="mt-2 text-sm text-zinc-500">
+                  <p className="mt-2 text-sm text-zinc-400">
                     {log.deviceId} / {log.sessionId}
                   </p>
-                  <p className="mt-2 text-sm text-zinc-500">
-                    筆數 {log.saleCount} / {formatDateTime(log.processedAt)}
+                  <p className="mt-2 text-sm text-zinc-400">
+                    銷售筆數 {log.saleCount} / {formatDateTime(log.processedAt)}
                   </p>
-                  {log.note ? <p className="mt-2 text-sm text-zinc-600">{log.note}</p> : null}
+                  {log.note ? <p className="mt-2 text-sm text-zinc-300">{log.note}</p> : null}
                 </div>
               ))}
             </div>

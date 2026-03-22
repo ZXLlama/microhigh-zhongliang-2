@@ -43,7 +43,7 @@ export function splitItemKey(key: string): { itemType: ItemType; itemId: string 
   const [itemType, itemId] = key.split(":");
 
   if (itemType !== "product" && itemType !== "bundle") {
-    throw new Error(`無效的項目 key: ${key}`);
+    throw new Error(`無法解析 item key: ${key}`);
   }
 
   return { itemType, itemId };

@@ -164,7 +164,7 @@ export function validateCatalogIntegrity(catalog: Catalog): CsvImportIssue[] {
         row: 0,
         column: product.priceCents < 0 ? "price" : "cost",
         severity: "error",
-        message: `商品 ${product.productId} 的售價與成本不可為負數`,
+        message: `商品 ${product.productId} 的售價或成本不得為負數`,
       });
     }
   }
@@ -198,7 +198,7 @@ export function validateCatalogIntegrity(catalog: Catalog): CsvImportIssue[] {
         row: 0,
         column: "bundle_price",
         severity: "error",
-        message: `組合包 ${bundle.bundleId} 的售價不可為負數`,
+        message: `組合包 ${bundle.bundleId} 的售價不得為負數`,
       });
     }
   }
@@ -208,13 +208,14 @@ export function validateCatalogIntegrity(catalog: Catalog): CsvImportIssue[] {
 
   for (const component of catalog.bundleComponents) {
     const componentKey = `${component.bundleId}::${component.productId}`;
+
     if (seenComponents.has(componentKey)) {
       issues.push({
         file: "bundle_components",
         row: 0,
         column: "bundle_id,product_id",
         severity: "error",
-        message: `重複的組合包成分: ${component.bundleId} / ${component.productId}`,
+        message: `重複的組合包內容: ${component.bundleId} / ${component.productId}`,
       });
     }
 
@@ -226,7 +227,7 @@ export function validateCatalogIntegrity(catalog: Catalog): CsvImportIssue[] {
         row: 0,
         column: "bundle_id",
         severity: "error",
-        message: `bundle_components 參照了不存在的 bundle_id: ${component.bundleId}`,
+        message: `bundle_components 指向不存在的 bundle_id: ${component.bundleId}`,
       });
     }
 
@@ -236,7 +237,7 @@ export function validateCatalogIntegrity(catalog: Catalog): CsvImportIssue[] {
         row: 0,
         column: "product_id",
         severity: "error",
-        message: `bundle_components 參照了不存在的 product_id: ${component.productId}`,
+        message: `bundle_components 指向不存在的 product_id: ${component.productId}`,
       });
     }
 
@@ -246,7 +247,7 @@ export function validateCatalogIntegrity(catalog: Catalog): CsvImportIssue[] {
         row: 0,
         column: "quantity",
         severity: "error",
-        message: `組合包成分數量必須大於 0: ${component.bundleId} / ${component.productId}`,
+        message: `組合包內容數量必須大於 0: ${component.bundleId} / ${component.productId}`,
       });
     }
   }
@@ -258,7 +259,7 @@ export function validateCatalogIntegrity(catalog: Catalog): CsvImportIssue[] {
         row: 0,
         column: "bundle_id",
         severity: "error",
-        message: `組合包 ${bundle.bundleId} 沒有任何成分`,
+        message: `組合包 ${bundle.bundleId} 沒有任何內容物`,
       });
     }
   }

@@ -1,12 +1,6 @@
-import {
-  APP_NAME,
-  LOCAL_SCHEMA_VERSION,
-  MAX_RECENT_ITEMS,
-} from "@/lib/constants";
+import { APP_NAME, LOCAL_SCHEMA_VERSION } from "@/lib/constants";
 import { createCatalog } from "@/lib/config";
-import {
-  createNextSession,
-} from "@/lib/sales";
+import { createNextSession } from "@/lib/sales";
 import {
   SAMPLE_BUNDLE_COMPONENTS,
   SAMPLE_BUNDLES,
@@ -19,14 +13,14 @@ import type {
   SpreadsheetSnapshot,
   SyncBatch,
 } from "@/lib/types";
-import { createId, itemKey } from "@/lib/utils";
+import { createId } from "@/lib/utils";
 
 export type LocalStateAction =
   | { type: "hydrate"; payload: LocalState }
   | { type: "replaceCatalog"; payload: Catalog }
   | { type: "addSale"; payload: SaleEvent }
+  | { type: "addSales"; payload: SaleEvent[] }
   | { type: "undoLastSale" }
-  | { type: "toggleFavorite"; payload: string }
   | { type: "prepareBatch"; payload: SyncBatch }
   | { type: "setBatchUploading"; payload: { batchId: string; now: string } }
   | {
@@ -53,22 +47,6 @@ function createDefaultCatalog(now: string): Catalog {
   });
 }
 
-function createFavoriteSeeds(catalog: Catalog): string[] {
-  const preferred = [
-    itemKey("product", "rice-ball"),
-    itemKey("bundle", "breakfast-set"),
-  ];
-
-  return preferred.filter((key) => {
-    const [itemType, itemId] = key.split(":");
-    if (itemType === "product") {
-      return catalog.products.some((product) => product.productId === itemId);
-    }
-
-    return catalog.bundles.some((bundle) => bundle.bundleId === itemId);
-  });
-}
-
 export function createInitialLocalState(
   deviceId = createId("device"),
   now = new Date().toISOString(),
@@ -82,15 +60,27 @@ export function createInitialLocalState(
     catalog,
     sales: [],
     outbox: [],
-    favorites: createFavoriteSeeds(catalog),
+    favorites: [],
     recentItemKeys: [],
     syncInfo: {
       status: "idle",
     },
     spreadsheetSnapshot: null,
     currentSession: createNextSession(deviceId, now),
-    lastUndoSaleId: null,
+    lastUndoSaleIds: [],
   };
+}
+
+function getLegacyUndoIds(rawState: Partial<LocalState> & { lastUndoSaleId?: unknown }) {
+  if (Array.isArray(rawState.lastUndoSaleIds)) {
+    return rawState.lastUndoSaleIds.filter((value): value is string => typeof value === "string");
+  }
+
+  if (typeof rawState.lastUndoSaleId === "string") {
+    return [rawState.lastUndoSaleId];
+  }
+
+  return [];
 }
 
 export function normalizeLoadedState(rawState: LocalState): LocalState {
@@ -124,12 +114,10 @@ export function normalizeLoadedState(rawState: LocalState): LocalState {
     catalog,
     sales: Array.isArray(rawState.sales) ? rawState.sales : [],
     outbox: Array.isArray(rawState.outbox) ? rawState.outbox : [],
-    favorites: Array.isArray(rawState.favorites)
-      ? rawState.favorites
-      : fallback.favorites,
+    favorites: Array.isArray(rawState.favorites) ? rawState.favorites : [],
     recentItemKeys: Array.isArray(rawState.recentItemKeys)
-      ? rawState.recentItemKeys.slice(0, MAX_RECENT_ITEMS)
-      : fallback.recentItemKeys,
+      ? rawState.recentItemKeys
+      : [],
     syncInfo: {
       ...fallback.syncInfo,
       ...rawState.syncInfo,
@@ -141,19 +129,36 @@ export function normalizeLoadedState(rawState: LocalState): LocalState {
         }
       : fallback.currentSession,
     spreadsheetSnapshot: rawState.spreadsheetSnapshot ?? null,
-    lastUndoSaleId: rawState.lastUndoSaleId ?? null,
+    lastUndoSaleIds: getLegacyUndoIds(rawState),
   };
-}
-
-function appendRecentItemKey(recentItemKeys: string[], key: string): string[] {
-  return [key, ...recentItemKeys.filter((existing) => existing !== key)].slice(
-    0,
-    MAX_RECENT_ITEMS,
-  );
 }
 
 function pendingStatusForState(state: LocalState): "idle" | "unsynced" {
   return state.sales.length > 0 || state.outbox.length > 0 ? "unsynced" : "idle";
+}
+
+function applyAddedSales(state: LocalState, sales: SaleEvent[]): LocalState {
+  if (sales.length === 0) {
+    return state;
+  }
+
+  const updatedSales = [...state.sales, ...sales];
+  const lastTimestamp = sales.at(-1)?.timestamp ?? state.currentSession.lastUpdatedAt;
+
+  return {
+    ...state,
+    sales: updatedSales,
+    lastUndoSaleIds: sales.map((sale) => sale.id),
+    currentSession: {
+      ...state.currentSession,
+      lastUpdatedAt: lastTimestamp,
+    },
+    syncInfo: {
+      ...state.syncInfo,
+      status: "unsynced",
+      lastError: undefined,
+    },
+  };
 }
 
 export function localStateReducer(
@@ -167,55 +172,32 @@ export function localStateReducer(
       return {
         ...state,
         catalog: action.payload,
-        favorites: state.favorites.filter((favorite) => {
-          const [itemType, itemId] = favorite.split(":");
-
-          if (itemType === "product") {
-            return action.payload.products.some((product) => product.productId === itemId);
-          }
-
-          return action.payload.bundles.some((bundle) => bundle.bundleId === itemId);
-        }),
       };
-    case "addSale": {
-      const updatedSales = [...state.sales, action.payload];
-      const key = itemKey(action.payload.itemType, action.payload.itemId);
-
-      return {
-        ...state,
-        sales: updatedSales,
-        recentItemKeys: appendRecentItemKey(state.recentItemKeys, key),
-        lastUndoSaleId: action.payload.id,
-        currentSession: {
-          ...state.currentSession,
-          lastUpdatedAt: action.payload.timestamp,
-        },
-        syncInfo: {
-          ...state.syncInfo,
-          status: "unsynced",
-          lastError: undefined,
-        },
-      };
-    }
+    case "addSale":
+      return applyAddedSales(state, [action.payload]);
+    case "addSales":
+      return applyAddedSales(state, action.payload);
     case "undoLastSale": {
-      if (state.outbox.length > 0 || !state.lastUndoSaleId) {
+      if (state.outbox.length > 0 || state.lastUndoSaleIds.length === 0) {
         return state;
       }
 
-      const target = state.sales.find((sale) => sale.id === state.lastUndoSaleId);
-      if (!target || target.syncState !== "pending") {
+      const removableIds = new Set(
+        state.lastUndoSaleIds.filter((saleId) =>
+          state.sales.some((sale) => sale.id === saleId && sale.syncState === "pending"),
+        ),
+      );
+
+      if (removableIds.size === 0) {
         return state;
       }
 
-      const nextSales = state.sales.filter((sale) => sale.id !== state.lastUndoSaleId);
-      const nextUndoSaleId = [...nextSales]
-        .reverse()
-        .find((sale) => sale.syncState === "pending")?.id;
+      const nextSales = state.sales.filter((sale) => !removableIds.has(sale.id));
 
       return {
         ...state,
         sales: nextSales,
-        lastUndoSaleId: nextUndoSaleId ?? null,
+        lastUndoSaleIds: [],
         syncInfo: {
           ...state.syncInfo,
           status: pendingStatusForState({
@@ -226,13 +208,6 @@ export function localStateReducer(
         },
       };
     }
-    case "toggleFavorite":
-      return {
-        ...state,
-        favorites: state.favorites.includes(action.payload)
-          ? state.favorites.filter((favorite) => favorite !== action.payload)
-          : [...state.favorites, action.payload],
-      };
     case "prepareBatch": {
       if (state.outbox.some((batch) => batch.batchId === action.payload.batchId)) {
         return state;
@@ -246,7 +221,7 @@ export function localStateReducer(
           saleIds.has(sale.id) ? { ...sale, syncState: "in_flight" } : sale,
         ),
         outbox: [...state.outbox, action.payload],
-        lastUndoSaleId: null,
+        lastUndoSaleIds: [],
         syncInfo: {
           ...state.syncInfo,
           status: "syncing",
@@ -318,11 +293,9 @@ export function localStateReducer(
               ...state.currentSession,
               lastUpdatedAt: action.payload.now,
             },
-        lastUndoSaleId: shouldReset
-          ? null
-          : [...remainingSales]
-              .reverse()
-              .find((sale) => sale.syncState === "pending")?.id ?? null,
+        lastUndoSaleIds: state.lastUndoSaleIds.filter((saleId) =>
+          remainingSales.some((sale) => sale.id === saleId),
+        ),
         syncInfo: {
           ...state.syncInfo,
           status: shouldReset ? "reset" : "unsynced",
@@ -386,7 +359,7 @@ export function localStateReducer(
           inFlightBatchId: undefined,
         },
         currentSession: createNextSession(state.deviceId, now),
-        lastUndoSaleId: null,
+        lastUndoSaleIds: [],
       };
     }
     default:

@@ -49,37 +49,39 @@ export function SyncSection({
 }: SyncSectionProps) {
   return (
     <div className="space-y-4">
-      <SectionCard title="同步狀態" subtitle="先本地，後上傳。失敗時本地資料不會刪除。">
+      <SectionCard title="同步狀態" subtitle="先確認本地資料與批次狀態，再決定是否上傳。">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <MetricCard label="同步狀態" value={state.syncInfo.status} />
-          <MetricCard label="待同步銷售" value={state.sales.length.toString()} />
+          <MetricCard label="本地銷售" value={state.sales.length.toString()} />
           <MetricCard label="待送批次" value={state.outbox.length.toString()} />
           <MetricCard
             label="最後成功批次"
-            value={state.syncInfo.lastSuccessBatchId ? "有" : "無"}
-            hint={state.syncInfo.lastSuccessBatchId ?? "尚未成功同步"}
+            value={state.syncInfo.lastSuccessBatchId ? "已記錄" : "尚無"}
+            hint={state.syncInfo.lastSuccessBatchId ?? "還沒有成功上傳過"}
           />
         </div>
         {state.syncInfo.lastError ? (
-          <div className="mt-4 rounded-3xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+          <div className="mt-4 rounded-3xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-200">
             {state.syncInfo.lastError}
           </div>
         ) : null}
       </SectionCard>
 
-      <SectionCard title="同步操作" subtitle="所有網路操作都會透過 Vercel API route。">
+      <SectionCard title="同步操作" subtitle="所有同步都會先走 Vercel API，再由後端轉送到 GAS。">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <button
             type="button"
             onClick={() => void onUpload()}
             disabled={isUploading || state.sales.length === 0}
-            className="min-h-14 rounded-3xl bg-zinc-950 px-4 text-left text-white disabled:cursor-not-allowed disabled:opacity-40"
+            className="min-h-14 rounded-3xl bg-zinc-100 px-4 text-left text-zinc-950 disabled:opacity-40"
           >
             <span className="flex items-center gap-3">
               <Upload className="h-5 w-5" />
               <span>
                 <span className="block text-base font-black">上傳營業額</span>
-                <span className="block text-sm text-zinc-300">成功後才會重製本地資料</span>
+                <span className="block text-sm text-zinc-600">
+                  將本地待同步銷售送到試算表
+                </span>
               </span>
             </span>
           </button>
@@ -87,15 +89,17 @@ export function SyncSection({
             type="button"
             onClick={() => void onRefreshSnapshot()}
             disabled={isRefreshingSnapshot}
-            className="min-h-14 rounded-3xl border border-zinc-200 bg-white px-4 text-left"
+            className="min-h-14 rounded-3xl border border-white/10 bg-white/5 px-4 text-left"
           >
             <span className="flex items-center gap-3">
-              <RefreshCcw className="h-5 w-5 text-zinc-700" />
+              <RefreshCcw className="h-5 w-5 text-zinc-200" />
               <span>
-                <span className="block text-base font-black text-zinc-950">
+                <span className="block text-base font-black text-zinc-50">
                   重新抓取試算表
                 </span>
-                <span className="block text-sm text-zinc-500">只讀，不會上傳本地資料</span>
+                <span className="block text-sm text-zinc-400">
+                  只更新最新總表，不會上傳本地資料
+                </span>
               </span>
             </span>
           </button>
@@ -103,15 +107,15 @@ export function SyncSection({
             type="button"
             onClick={() => void onSyncCatalog()}
             disabled={isSyncingCatalog}
-            className="min-h-14 rounded-3xl border border-zinc-200 bg-white px-4 text-left"
+            className="min-h-14 rounded-3xl border border-white/10 bg-white/5 px-4 text-left"
           >
             <span className="flex items-center gap-3">
-              <Database className="h-5 w-5 text-zinc-700" />
+              <Database className="h-5 w-5 text-zinc-200" />
               <span>
-                <span className="block text-base font-black text-zinc-950">
-                  同步商品設定到試算表
+                <span className="block text-base font-black text-zinc-50">
+                  同步商品設定
                 </span>
-                <span className="block text-sm text-zinc-500">
+                <span className="block text-sm text-zinc-400">
                   更新 Products / Bundles / BundleComponents
                 </span>
               </span>
@@ -121,16 +125,16 @@ export function SyncSection({
             type="button"
             onClick={() => void onCheckHealth()}
             disabled={isCheckingHealth}
-            className="min-h-14 rounded-3xl border border-zinc-200 bg-white px-4 text-left"
+            className="min-h-14 rounded-3xl border border-white/10 bg-white/5 px-4 text-left"
           >
             <span className="flex items-center gap-3">
-              <ShieldCheck className="h-5 w-5 text-zinc-700" />
+              <ShieldCheck className="h-5 w-5 text-zinc-200" />
               <span>
-                <span className="block text-base font-black text-zinc-950">
-                  檢查 API 健康狀態
+                <span className="block text-base font-black text-zinc-50">
+                  檢查 API 狀態
                 </span>
-                <span className="block text-sm text-zinc-500">
-                  驗證 Vercel API 與 GAS 設定
+                <span className="block text-sm text-zinc-400">
+                  確認 Vercel API 與 GAS 是否可用
                 </span>
               </span>
             </span>
@@ -138,32 +142,32 @@ export function SyncSection({
         </div>
 
         {health ? (
-          <div className="mt-4 rounded-3xl border border-zinc-200 bg-zinc-50 p-4">
-            <p className="font-black text-zinc-950">健康檢查結果</p>
-            <p className="mt-2 text-sm text-zinc-600">
+          <div className="mt-4 rounded-3xl border border-white/10 bg-white/5 p-4">
+            <p className="font-black text-zinc-50">健康檢查結果</p>
+            <p className="mt-2 text-sm text-zinc-400">
               Server Time：{formatDateTime(health.serverTime)}
             </p>
-            <p className="mt-1 text-sm text-zinc-600">
-              GAS 設定：{health.gasConfigured ? "已設定" : "未設定"}
+            <p className="mt-1 text-sm text-zinc-400">
+              GAS 狀態：{health.gasConfigured ? "已連線" : "未連線"}
             </p>
           </div>
         ) : null}
       </SectionCard>
 
-      <SectionCard title="匯出與備份" subtitle="設定檔與完整本地資料都可以先備份再操作。">
+      <SectionCard title="匯出 / 匯入" subtitle="建議在活動前後各做一次 JSON 備份。">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <button
             type="button"
             onClick={onExportCatalogCsv}
-            className="min-h-14 rounded-3xl border border-zinc-200 bg-white px-4 text-left"
+            className="min-h-14 rounded-3xl border border-white/10 bg-white/5 px-4 text-left"
           >
             <span className="flex items-center gap-3">
-              <Download className="h-5 w-5 text-zinc-700" />
+              <Download className="h-5 w-5 text-zinc-200" />
               <span>
-                <span className="block text-base font-black text-zinc-950">
-                  匯出目前設定 CSV
+                <span className="block text-base font-black text-zinc-50">
+                  匯出商品 CSV
                 </span>
-                <span className="block text-sm text-zinc-500">
+                <span className="block text-sm text-zinc-400">
                   下載 products / bundles / bundle_components
                 </span>
               </span>
@@ -172,16 +176,16 @@ export function SyncSection({
           <button
             type="button"
             onClick={() => void onExportBackupDownload()}
-            className="min-h-14 rounded-3xl border border-zinc-200 bg-white px-4 text-left"
+            className="min-h-14 rounded-3xl border border-white/10 bg-white/5 px-4 text-left"
           >
             <span className="flex items-center gap-3">
-              <Download className="h-5 w-5 text-zinc-700" />
+              <Download className="h-5 w-5 text-zinc-200" />
               <span>
-                <span className="block text-base font-black text-zinc-950">
+                <span className="block text-base font-black text-zinc-50">
                   下載 JSON 備份
                 </span>
-                <span className="block text-sm text-zinc-500">
-                  含本地銷售、設定、同步狀態
+                <span className="block text-sm text-zinc-400">
+                  保存目前本地狀態與歷史紀錄
                 </span>
               </span>
             </span>
@@ -189,29 +193,29 @@ export function SyncSection({
           <button
             type="button"
             onClick={() => void onExportBackupFileSystem()}
-            className="min-h-14 rounded-3xl border border-zinc-200 bg-white px-4 text-left"
+            className="min-h-14 rounded-3xl border border-white/10 bg-white/5 px-4 text-left"
           >
             <span className="flex items-center gap-3">
-              <Smartphone className="h-5 w-5 text-zinc-700" />
+              <Smartphone className="h-5 w-5 text-zinc-200" />
               <span>
-                <span className="block text-base font-black text-zinc-950">
-                  用 File System API 儲存
+                <span className="block text-base font-black text-zinc-50">
+                  用 File System API 匯出
                 </span>
-                <span className="block text-sm text-zinc-500">
-                  不支援的瀏覽器會自動改用下載
+                <span className="block text-sm text-zinc-400">
+                  支援的瀏覽器可直接指定下載位置
                 </span>
               </span>
             </span>
           </button>
-          <label className="min-h-14 rounded-3xl border border-zinc-200 bg-white px-4 py-3 text-left">
+          <label className="min-h-14 rounded-3xl border border-white/10 bg-white/5 px-4 py-3 text-left">
             <span className="flex items-center gap-3">
-              <CloudUpload className="h-5 w-5 text-zinc-700" />
+              <CloudUpload className="h-5 w-5 text-zinc-200" />
               <span>
-                <span className="block text-base font-black text-zinc-950">
+                <span className="block text-base font-black text-zinc-50">
                   匯入 JSON 備份
                 </span>
-                <span className="block text-sm text-zinc-500">
-                  會覆蓋目前本地資料
+                <span className="block text-sm text-zinc-400">
+                  覆蓋目前本地資料，請先確認檔案來源
                 </span>
               </span>
             </span>
@@ -221,7 +225,7 @@ export function SyncSection({
               onChange={(event) =>
                 void onImportBackupFile(event.currentTarget.files?.[0] ?? null)
               }
-              className="mt-3 block w-full text-sm text-zinc-600"
+              className="mt-3 block w-full text-sm text-zinc-400 file:mr-3 file:rounded-xl file:border-0 file:bg-white/10 file:px-3 file:py-2 file:text-sm file:font-bold file:text-zinc-100"
             />
           </label>
         </div>

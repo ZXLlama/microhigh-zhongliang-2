@@ -29,6 +29,10 @@ function isBoolean(value: unknown): value is boolean {
   return typeof value === "boolean";
 }
 
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every(isString);
+}
+
 function isProduct(value: unknown): value is Product {
   return (
     isRecord(value) &&
@@ -204,6 +208,13 @@ export function isCatalogImportPayload(value: unknown): value is CatalogImportPa
 }
 
 export function isLocalState(value: unknown): value is LocalState {
+  const legacyLastUndoSaleId =
+    isRecord(value) && (value.lastUndoSaleId === null || isString(value.lastUndoSaleId));
+  const lastUndoSaleIdsValid =
+    isRecord(value) &&
+    ((value.lastUndoSaleIds === undefined && legacyLastUndoSaleId) ||
+      isStringArray(value.lastUndoSaleIds));
+
   return (
     isRecord(value) &&
     isNumber(value.schemaVersion) &&
@@ -214,10 +225,8 @@ export function isLocalState(value: unknown): value is LocalState {
     value.sales.every(isSaleEvent) &&
     Array.isArray(value.outbox) &&
     value.outbox.every(isSyncBatch) &&
-    Array.isArray(value.favorites) &&
-    value.favorites.every(isString) &&
-    Array.isArray(value.recentItemKeys) &&
-    value.recentItemKeys.every(isString) &&
+    (value.favorites === undefined || isStringArray(value.favorites)) &&
+    (value.recentItemKeys === undefined || isStringArray(value.recentItemKeys)) &&
     isRecord(value.syncInfo) &&
     isString(value.syncInfo.status) &&
     (value.syncInfo.lastSyncAt === undefined || isString(value.syncInfo.lastSyncAt)) &&
@@ -235,7 +244,7 @@ export function isLocalState(value: unknown): value is LocalState {
     isString(value.currentSession.deviceId) &&
     isString(value.currentSession.startedAt) &&
     isString(value.currentSession.lastUpdatedAt) &&
-    (value.lastUndoSaleId === null || isString(value.lastUndoSaleId))
+    lastUndoSaleIdsValid
   );
 }
 
@@ -245,7 +254,7 @@ export function isBackupPayload(value: unknown): value is BackupPayload {
 
 export function assertSyncBatch(value: unknown): SyncBatch {
   if (!isSyncBatch(value)) {
-    throw new Error("同步批次格式不正確");
+    throw new Error("同步批次資料格式不正確");
   }
 
   return value;
@@ -253,7 +262,7 @@ export function assertSyncBatch(value: unknown): SyncBatch {
 
 export function assertCatalogImportPayload(value: unknown): CatalogImportPayload {
   if (!isCatalogImportPayload(value)) {
-    throw new Error("CSV 匯入內容格式不正確");
+    throw new Error("CSV 匯入資料格式不正確");
   }
 
   return value;
@@ -261,7 +270,7 @@ export function assertCatalogImportPayload(value: unknown): CatalogImportPayload
 
 export function assertCatalog(value: unknown): Catalog {
   if (!isCatalog(value)) {
-    throw new Error("商品設定格式不正確");
+    throw new Error("商品設定資料格式不正確");
   }
 
   return value;
@@ -269,7 +278,7 @@ export function assertCatalog(value: unknown): Catalog {
 
 export function assertSpreadsheetSnapshot(value: unknown): SpreadsheetSnapshot {
   if (!isSpreadsheetSnapshot(value)) {
-    throw new Error("試算表回傳格式異常");
+    throw new Error("試算表快照資料格式不正確");
   }
 
   return value;
@@ -285,7 +294,7 @@ export function assertBackupPayload(value: unknown): BackupPayload {
 
 export function assertLocalState(value: unknown): LocalState {
   if (!isLocalState(value)) {
-    throw new Error("本地狀態格式不正確");
+    throw new Error("本地狀態資料格式不正確");
   }
 
   return value;

@@ -1,11 +1,11 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f8fafc;
-  --foreground: #18181b;
-  --muted: #71717a;
-  --accent: #ea580c;
-  --card: rgba(255, 255, 255, 0.92);
+  --background: #0a0a0f;
+  --foreground: #f4f4f5;
+  --muted: #a1a1aa;
+  --accent: #f97316;
+  --card: rgba(20, 20, 27, 0.92);
 }
 
 @theme inline {
@@ -20,11 +20,13 @@
 }
 
 html {
-  color-scheme: light;
+  color-scheme: dark;
 }
 
 body {
-  background: var(--background);
+  background:
+    radial-gradient(circle at top, rgba(249, 115, 22, 0.12), transparent 28%),
+    linear-gradient(180deg, #121219 0%, #08080c 55%, #050507 100%);
   color: var(--foreground);
   font-family: var(--font-noto-sans-tc), sans-serif;
 }
@@ -45,7 +47,7 @@ select {
 }
 
 ::selection {
-  background: rgba(234, 88, 12, 0.2);
+  background: rgba(249, 115, 22, 0.24);
 }
 
 a {

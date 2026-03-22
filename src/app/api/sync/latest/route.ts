@@ -17,7 +17,7 @@ export async function GET() {
     return NextResponse.json(
       {
         ok: false,
-        error: error instanceof Error ? error.message : "無法抓取試算表資料",
+        error: error instanceof Error ? error.message : "抓取試算表資料失敗",
       },
       {
         status: 500,

@@ -34,11 +34,7 @@ const BUNDLE_COLUMNS = [
   "sort_order",
 ] as const;
 
-const BUNDLE_COMPONENT_COLUMNS = [
-  "bundle_id",
-  "product_id",
-  "quantity",
-] as const;
+const BUNDLE_COMPONENT_COLUMNS = ["bundle_id", "product_id", "quantity"] as const;
 
 function pushIssue(
   issues: CsvImportIssue[],
@@ -83,7 +79,7 @@ function parseCsvRows(
   const headers = parsed.meta.fields ?? [];
   for (const column of expectedColumns) {
     if (!headers.includes(column)) {
-      pushIssue(issues, file, 1, column, `缺少必要欄位 ${column}`);
+      pushIssue(issues, file, 1, column, `缺少欄位 ${column}`);
     }
   }
 
@@ -110,7 +106,7 @@ function parseBooleanCell(
     return false;
   }
 
-  pushIssue(issues, file, row, column, "布林值需為 true/false、1/0、yes/no");
+  pushIssue(issues, file, row, column, "請填 true/false 或 1/0 或 yes/no");
   return false;
 }
 
@@ -128,13 +124,14 @@ function parseIntegerCell(
   }
 
   const parsed = Number.parseInt(value, 10);
+
   if (!Number.isInteger(parsed)) {
-    pushIssue(issues, file, row, column, "需為整數");
+    pushIssue(issues, file, row, column, "請填整數");
     return 0;
   }
 
   if (options?.min !== undefined && parsed < options.min) {
-    pushIssue(issues, file, row, column, `需大於或等於 ${options.min}`);
+    pushIssue(issues, file, row, column, `數值不得小於 ${options.min}`);
   }
 
   return parsed;
@@ -204,14 +201,15 @@ function parseProductsCsv(csvText: string): { products: Product[]; issues: CsvIm
     if (row.profit) {
       try {
         const profitCents = parseMoneyInputToCents(row.profit);
-        const derived = priceCents - costCents;
-        if (profitCents !== derived) {
+        const derivedProfit = priceCents - costCents;
+
+        if (profitCents !== derivedProfit) {
           pushIssue(
             issues,
             "products",
             rowNumber,
             "profit",
-            "profit 欄位與 price - cost 不一致，系統會以自動計算結果為準",
+            "profit 與 price - cost 不一致，系統會以售價與成本重新計算",
             "warning",
           );
         }
@@ -221,7 +219,7 @@ function parseProductsCsv(csvText: string): { products: Product[]; issues: CsvIm
           "products",
           rowNumber,
           "profit",
-          "profit 欄位格式錯誤，系統會以自動計算結果為準",
+          "profit 無法解析，系統會改用售價減成本",
           "warning",
         );
       }

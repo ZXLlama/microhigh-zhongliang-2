@@ -18,14 +18,15 @@ import {
 } from "@/lib/api";
 import { exportCatalogToCsv } from "@/lib/csv";
 import { assertLocalState } from "@/lib/guards";
-import { findBundle, findProduct } from "@/lib/sales";
-import { createBundleSaleEvent, createProductSaleEvent } from "@/lib/sales";
+import { formatMoney } from "@/lib/money";
+import { buildCheckoutPreview, createSaleEventsFromCart } from "@/lib/sales";
 import { createInitialLocalState, localStateReducer } from "@/lib/state";
-import { parseBackupPayload, savePersistedState, loadPersistedState } from "@/lib/storage";
+import { loadPersistedState, parseBackupPayload, savePersistedState } from "@/lib/storage";
 import { getNextSyncCandidate } from "@/lib/sync";
 import type {
   CatalogImportPayload,
   CatalogValidationResult,
+  CheckoutCartItem,
   ConfigSyncResponse,
   HealthResponse,
   LocalState,
@@ -54,11 +55,9 @@ interface AppContextValue {
   health: HealthResponse | null;
   notice: Notice | null;
   dismissNotice: () => void;
-  addProductSale: (productId: string) => void;
-  addBundleSale: (bundleId: string) => void;
+  checkoutCart: (items: CheckoutCartItem[]) => boolean;
   undoLastSale: () => void;
   clearLocalSales: () => void;
-  toggleFavorite: (key: string) => void;
   importCatalogCsv: (
     payload: CatalogImportPayload,
   ) => Promise<CatalogValidationResult>;
@@ -147,7 +146,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     void savePersistedState(state).catch(() => {
       setNotice({
         tone: "error",
-        message: "本地儲存失敗，請先匯出 JSON 備份。",
+        message: "本地資料寫入失敗，請先匯出 JSON 備份。",
       });
     });
   }, [isHydrated, state]);
@@ -182,54 +181,47 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setNotice(null);
   }
 
-  function addProductSale(productId: string) {
-    const product = findProduct(stateRef.current.catalog, productId);
+  function checkoutCart(items: CheckoutCartItem[]): boolean {
+    const filteredItems = items.filter((item) => item.quantity > 0);
 
-    if (!product) {
-      pushNotice("找不到商品資料", "error");
-      return;
+    if (filteredItems.length === 0) {
+      pushNotice("購物車是空的，請先加入商品。", "error");
+      return false;
     }
 
-    dispatch({
-      type: "addSale",
-      payload: createProductSaleEvent({ product }),
-    });
-    pushNotice(`已記錄 ${product.name}`, "success");
-  }
+    try {
+      const sales = createSaleEventsFromCart(stateRef.current.catalog, filteredItems);
+      const preview = buildCheckoutPreview(stateRef.current.catalog, filteredItems);
 
-  function addBundleSale(bundleId: string) {
-    const bundle = findBundle(stateRef.current.catalog, bundleId);
+      dispatch({
+        type: "addSales",
+        payload: sales,
+      });
 
-    if (!bundle) {
-      pushNotice("找不到組合包資料", "error");
-      return;
+      pushNotice(
+        `本輪已累加 ${preview.summary.totalQuantity} 件，小計 ${formatMoney(
+          preview.summary.revenueCents,
+        )}`,
+        "success",
+      );
+      return true;
+    } catch (error) {
+      pushNotice(
+        error instanceof Error ? error.message : "收銀失敗，請重新確認購物車內容。",
+        "error",
+      );
+      return false;
     }
-
-    dispatch({
-      type: "addSale",
-      payload: createBundleSaleEvent({
-        bundle,
-        catalog: stateRef.current.catalog,
-      }),
-    });
-    pushNotice(`已記錄 ${bundle.bundleName}`, "success");
   }
 
   function undoLastSale() {
     dispatch({ type: "undoLastSale" });
-    pushNotice("已撤銷最後一筆本地操作", "info");
+    pushNotice("已撤銷上一輪收銀。", "info");
   }
 
   function clearLocalSales() {
     dispatch({ type: "clearSales" });
-    pushNotice("本地當日資料已清除", "info");
-  }
-
-  function toggleFavorite(key: string) {
-    dispatch({
-      type: "toggleFavorite",
-      payload: key,
-    });
+    pushNotice("今日本地銷售資料已清空。", "info");
   }
 
   async function importCatalogCsv(
@@ -238,7 +230,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const result = await validateCatalogImport(payload);
 
     if (!result.catalog) {
-      pushNotice("CSV 驗證失敗，請先修正錯誤列", "error");
+      pushNotice("CSV 驗證失敗，請先修正錯誤列。", "error");
       return result;
     }
 
@@ -246,14 +238,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       type: "replaceCatalog",
       payload: result.catalog,
     });
-    pushNotice("商品與組合包設定已套用到本地", "success");
+    pushNotice("商品與組合包設定已更新到本地。", "success");
 
     return result;
   }
 
   async function syncCatalog(): Promise<ConfigSyncResponse> {
     if (!navigator.onLine) {
-      throw new Error("目前離線，無法同步設定到試算表");
+      throw new Error("目前離線，無法同步商品設定到試算表。");
     }
 
     setIsSyncingCatalog(true);
@@ -268,7 +260,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       pushNotice(result.message, "success");
       return result;
     } catch (error) {
-      const message = error instanceof Error ? error.message : "設定同步失敗";
+      const message = error instanceof Error ? error.message : "商品設定同步失敗";
       dispatch({
         type: "setSyncError",
         payload: { error: message },
@@ -282,7 +274,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   async function refreshSpreadsheetSnapshot() {
     if (!navigator.onLine) {
-      throw new Error("目前離線，無法抓取試算表資料");
+      throw new Error("目前離線，無法重新抓取試算表資料。");
     }
 
     setIsRefreshingSnapshot(true);
@@ -298,7 +290,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         type: "setSyncSuccess",
         payload: { now: new Date().toISOString() },
       });
-      pushNotice("已更新試算表累計資料", "success");
+      pushNotice("已重新抓取最新試算表資料。", "success");
     } catch (error) {
       const message = error instanceof Error ? error.message : "抓取試算表資料失敗";
       dispatch({
@@ -314,7 +306,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   async function uploadPendingSales() {
     if (!navigator.onLine) {
-      throw new Error("目前離線，無法上傳營業額");
+      throw new Error("目前離線，無法上傳營業額。");
     }
 
     if (isUploading) {
@@ -362,7 +354,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           processedCount += 1;
           await waitForRenderTurn();
         } catch (error) {
-          const message = error instanceof Error ? error.message : "同步上傳失敗";
+          const message = error instanceof Error ? error.message : "上傳營業額失敗";
           dispatch({
             type: "setBatchFailed",
             payload: {
@@ -377,11 +369,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (processedCount === 0) {
-        pushNotice("目前沒有待上傳的本地資料", "info");
+        pushNotice("目前沒有待上傳的本地銷售資料。", "info");
         return;
       }
 
-      pushNotice("本地資料已上傳，且同步後已重置本地記錄", "success");
+      pushNotice("本地銷售已成功上傳，並已更新最新試算表結果。", "success");
     } finally {
       setIsUploading(false);
     }
@@ -396,7 +388,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       csvBundle.bundleComponentsCsv,
       "text/csv;charset=utf-8",
     );
-    pushNotice("已匯出三份 CSV 設定檔", "success");
+    pushNotice("已匯出商品設定 CSV。", "success");
   }
 
   async function exportBackupJson(preferFileSystemApi = false) {
@@ -415,12 +407,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     if (preferFileSystemApi && supportsFileSystemAccessApi()) {
       await saveTextWithFileSystemApi(filename, payload, "application/json");
-      pushNotice("已透過 File System Access API 儲存備份檔", "success");
+      pushNotice("已使用 File System Access API 匯出備份。", "success");
       return;
     }
 
     downloadTextFile(filename, payload, "application/json;charset=utf-8");
-    pushNotice("已下載 JSON 備份檔", "success");
+    pushNotice("已下載 JSON 備份。", "success");
   }
 
   function importBackupJson(jsonText: string) {
@@ -429,12 +421,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       type: "hydrate",
       payload: backup.state,
     });
-    pushNotice("已從 JSON 備份還原本地資料", "success");
+    pushNotice("JSON 備份已匯入完成。", "success");
   }
 
   async function checkHealth() {
     if (!navigator.onLine) {
-      throw new Error("目前離線，無法檢查連線狀態");
+      throw new Error("目前離線，無法檢查 API 狀態。");
     }
 
     setIsCheckingHealth(true);
@@ -443,7 +435,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const response = await fetchHealth();
       setHealth(response);
       pushNotice(
-        response.gasConfigured ? "Vercel API 與 GAS 設定正常" : "GAS_WEBAPP_URL 尚未設定",
+        response.gasConfigured ? "Vercel API 已成功連到 GAS。" : "尚未設定 GAS_WEBAPP_URL。",
         response.gasConfigured ? "success" : "error",
       );
     } finally {
@@ -462,11 +454,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     health,
     notice,
     dismissNotice,
-    addProductSale,
-    addBundleSale,
+    checkoutCart,
     undoLastSale,
     clearLocalSales,
-    toggleFavorite,
     importCatalogCsv,
     syncCatalog,
     refreshSpreadsheetSnapshot,
@@ -484,7 +474,7 @@ export function usePosApp() {
   const context = useContext(AppContext);
 
   if (!context) {
-    throw new Error("usePosApp 必須在 AppProvider 內使用");
+    throw new Error("usePosApp 必須放在 AppProvider 內使用");
   }
 
   return context;
