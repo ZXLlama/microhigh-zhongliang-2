@@ -1,0 +1,4 @@
+bundle_id,bundle_name,bundle_price,is_active,sort_order
+breakfast-set,早餐補給組,75,true,10
+dessert-tea-set,甜點紅茶組,72,true,20
+double-egg-set,雙蛋豆漿組,60,true,30

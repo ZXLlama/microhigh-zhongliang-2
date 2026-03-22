@@ -1,0 +1,6 @@
+product_id,name,price,cost,profit,category,is_active,sort_order
+rice-ball,飯糰,55,28,27,主食,true,10
+soy-milk,豆漿,30,12,18,飲料,true,20
+tea-egg,茶葉蛋,18,8,10,小點,true,30
+brownie,米香布朗尼,45,18,27,甜點,true,40
+lemon-tea,檸檬紅茶,40,15,25,飲料,true,50
