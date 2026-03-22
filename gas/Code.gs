@@ -481,13 +481,29 @@ function validateBatch_(batch) {
 }
 
 function ensureSheets_() {
-  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  const spreadsheet = getSpreadsheet_();
   ensureSheet_(spreadsheet, SHEETS.PRODUCTS, HEADERS.Products);
   ensureSheet_(spreadsheet, SHEETS.BUNDLES, HEADERS.Bundles);
   ensureSheet_(spreadsheet, SHEETS.COMPONENTS, HEADERS.BundleComponents);
   ensureSheet_(spreadsheet, SHEETS.SALES_LOG, HEADERS.SalesLog);
   ensureSheet_(spreadsheet, SHEETS.SUMMARY, HEADERS.Summary);
   ensureSheet_(spreadsheet, SHEETS.SYNC_LOG, HEADERS.SyncLog);
+}
+
+function getSpreadsheet_() {
+  const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  if (activeSpreadsheet) {
+    return activeSpreadsheet;
+  }
+
+  const spreadsheetId = PropertiesService.getScriptProperties().getProperty("SPREADSHEET_ID");
+  if (spreadsheetId && spreadsheetId.trim()) {
+    return SpreadsheetApp.openById(spreadsheetId.trim());
+  }
+
+  throw new Error(
+    "No spreadsheet connected. Bind this Apps Script to a Google Sheet, or set Script Property SPREADSHEET_ID.",
+  );
 }
 
 function ensureSheet_(spreadsheet, name, headers) {
@@ -502,7 +518,7 @@ function ensureSheet_(spreadsheet, name, headers) {
 }
 
 function readSheetObjects_(sheetName) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  const sheet = getSpreadsheet_().getSheetByName(sheetName);
   const values = sheet.getDataRange().getValues();
   if (values.length <= 1) {
     return [];
@@ -518,7 +534,7 @@ function readSheetObjects_(sheetName) {
 }
 
 function writeSheetObjects_(sheetName, headers, objects) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  const sheet = getSpreadsheet_().getSheetByName(sheetName);
   if (sheet.getLastRow() > 1) {
     sheet.getRange(2, 1, sheet.getLastRow() - 1, headers.length).clearContent();
   }
@@ -532,7 +548,7 @@ function writeSheetObjects_(sheetName, headers, objects) {
 }
 
 function appendSheetObjects_(sheetName, headers, objects) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  const sheet = getSpreadsheet_().getSheetByName(sheetName);
   if (objects.length === 0) {
     return;
   }
