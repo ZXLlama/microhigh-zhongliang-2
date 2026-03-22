@@ -7,9 +7,7 @@ import { getNextSyncCandidate } from "../src/lib/sync";
 describe("sync flow", () => {
   it("counts bundle-driven quantities and resets after successful upload", () => {
     const initial = createInitialLocalState("device_test", "2026-03-22T10:00:00.000Z");
-    const bundle = initial.catalog.bundles.find(
-      (item) => item.bundleId === "double-egg-set",
-    );
+    const bundle = initial.catalog.bundles.find((item) => item.bundleId === "C-set");
 
     if (!bundle) {
       throw new Error("sample bundle not found");

@@ -62,11 +62,15 @@ export function CartSection({
           </div>
         ) : (
           <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <MetricCard label="品項數" value={cartPreview.summary.lineCount.toString()} />
-              <MetricCard label="總件數" value={cartPreview.summary.totalQuantity.toString()} />
-              <MetricCard label="本輪小計" value={formatMoney(cartPreview.summary.revenueCents)} />
-              <MetricCard label="本輪淨利" value={formatMoney(cartPreview.summary.profitCents)} />
+            <div className="grid grid-cols-2 gap-3">
+              <MetricCard
+                label="本輪小計"
+                value={formatMoney(cartPreview.summary.revenueCents)}
+              />
+              <MetricCard
+                label="本輪淨利"
+                value={formatMoney(cartPreview.summary.profitCents)}
+              />
             </div>
 
             {cartPreview.lines.map((line) => (
@@ -149,13 +153,19 @@ export function CartSection({
               </div>
             ))}
 
+            <div className="grid grid-cols-2 gap-3">
+              <MetricCard label="品項數" value={cartPreview.summary.lineCount.toString()} />
+              <MetricCard label="總件數" value={cartPreview.summary.totalQuantity.toString()} />
+            </div>
+
             <div className="flex flex-wrap gap-3">
               <button
                 type="button"
-                onClick={onGoCashier}
-                className="min-h-12 rounded-2xl border border-white/10 bg-white/5 px-4 text-sm font-bold text-zinc-100"
+                onClick={onCheckoutCart}
+                className="inline-flex min-h-12 items-center gap-2 rounded-2xl bg-orange-400 px-4 text-sm font-black text-zinc-950"
               >
-                回收銀台繼續加商品
+                <ShoppingCart className="h-4 w-4" />
+                確認收銀並累加
               </button>
               <button
                 type="button"
@@ -166,11 +176,10 @@ export function CartSection({
               </button>
               <button
                 type="button"
-                onClick={onCheckoutCart}
-                className="inline-flex min-h-12 items-center gap-2 rounded-2xl bg-orange-400 px-4 text-sm font-black text-zinc-950"
+                onClick={onGoCashier}
+                className="min-h-12 rounded-2xl border border-white/10 bg-white/5 px-4 text-sm font-bold text-zinc-100"
               >
-                <ShoppingCart className="h-4 w-4" />
-                確認收銀並累加
+                回收銀台繼續加商品
               </button>
             </div>
           </div>

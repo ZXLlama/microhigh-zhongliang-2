@@ -87,8 +87,12 @@ export function normalizeLoadedState(rawState: LocalState): LocalState {
   const now = new Date().toISOString();
   const fallback = createInitialLocalState(rawState.deviceId, now);
   let catalog = fallback.catalog;
+  const shouldRefreshSampleCatalog =
+    rawState.catalog?.metadata?.source === "sample" &&
+    (rawState.sales?.length ?? 0) === 0 &&
+    (rawState.outbox?.length ?? 0) === 0;
 
-  if (rawState.catalog) {
+  if (rawState.catalog && !shouldRefreshSampleCatalog) {
     const rebuiltCatalog = createCatalog({
       products: rawState.catalog.products ?? [],
       bundles: rawState.catalog.bundles ?? [],
